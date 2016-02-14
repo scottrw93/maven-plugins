@@ -396,7 +396,8 @@ public class ShadeMojo
     public void execute()
         throws MojoExecutionException
     {
-        if ( skip ) {
+        if ( skip )
+        {
             getLog().info( "Skipping shade plugin" );
         }
 
