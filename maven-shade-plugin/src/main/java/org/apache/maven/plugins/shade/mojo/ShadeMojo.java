@@ -376,6 +376,9 @@ public class ShadeMojo
     @Parameter( defaultValue = "false" )
     private boolean shadeTestJar;
 
+    @Parameter( property = "maven.shade.skip", defaultValue = "false" )
+    private boolean skip;
+
     /**
      * @since 1.6
      */
@@ -393,6 +396,9 @@ public class ShadeMojo
     public void execute()
         throws MojoExecutionException
     {
+        if ( skip ) {
+            getLog().info( "Skipping shade plugin" );
+        }
 
         setupHintedShader();
 
