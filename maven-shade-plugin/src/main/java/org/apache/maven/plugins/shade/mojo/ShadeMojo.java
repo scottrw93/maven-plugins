@@ -399,6 +399,7 @@ public class ShadeMojo
         if ( skip )
         {
             getLog().info( "Skipping shade plugin" );
+            return;
         }
 
         setupHintedShader();
