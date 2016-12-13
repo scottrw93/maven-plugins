@@ -19,6 +19,14 @@ package org.apache.maven.plugins.help;
  * under the License.
  */
 
+import java.io.IOException;
+import java.io.StringWriter;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -32,14 +40,6 @@ import org.codehaus.plexus.util.StringUtils;
 import org.codehaus.plexus.util.xml.PrettyPrintXMLWriter;
 import org.codehaus.plexus.util.xml.XMLWriter;
 import org.codehaus.plexus.util.xml.XmlWriterUtil;
-
-import java.io.IOException;
-import java.io.StringWriter;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
 
 /**
  * Displays the calculated settings as XML for this project, given any profile enhancement and the inheritance
@@ -112,23 +112,17 @@ public class EffectiveSettingsMojo
                 throw new MojoExecutionException( "Cannot write effective-settings to output: " + output, e );
             }
 
-            if ( getLog().isInfoEnabled() )
-            {
-                getLog().info( "Effective-settings written to: " + output );
-            }
+            getLog().info( "Effective-settings written to: " + output );
         }
         else
         {
             StringBuilder message = new StringBuilder();
 
-            message.append( "\nEffective user-specific configuration settings:\n\n" );
+            message.append( LS ).append( "Effective user-specific configuration settings:" ).append( LS ).append( LS );
             message.append( effectiveSettings );
-            message.append( "\n" );
+            message.append( LS );
 
-            if ( getLog().isInfoEnabled() )
-            {
-                getLog().info( message.toString() );
-            }
+            getLog().info( message.toString() );
         }
     }
 

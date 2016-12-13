@@ -29,31 +29,25 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
-import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.repository.ArtifactRepository;
-import org.apache.maven.artifact.repository.ArtifactRepositoryFactory;
 import org.apache.maven.artifact.repository.layout.ArtifactRepositoryLayout;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.testing.AbstractMojoTestCase;
+import org.apache.maven.plugin.testing.stubs.MavenProjectStub;
 import org.apache.maven.plugins.deploy.stubs.ArtifactDeployerStub;
 import org.apache.maven.plugins.deploy.stubs.ArtifactRepositoryStub;
 import org.apache.maven.plugins.deploy.stubs.DeployArtifactStub;
-import org.apache.maven.plugin.testing.AbstractMojoTestCase;
-import org.apache.maven.plugin.testing.stubs.MavenProjectStub;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.repository.internal.MavenRepositorySystemSession;
-import org.apache.maven.shared.artifact.deploy.ArtifactDeployer;
+import org.apache.maven.shared.project.deploy.ProjectDeployerRequest;
 import org.codehaus.plexus.util.FileUtils;
-import org.junit.Assume;
 import org.junit.Ignore;
-import org.junit.internal.builders.IgnoredBuilder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.sonatype.aether.RepositorySystemSession;
 import org.sonatype.aether.impl.internal.SimpleLocalRepositoryManager;
-import org.sonatype.aether.repository.LocalRepositoryManager;
 
 /**
  * @author <a href="mailto:aramirez@apache.org">Allan Ramirez</a>
@@ -412,6 +406,13 @@ public class DeployMojoTest
                                  "target/test-classes/unit/basic-deploy-test/plugin-config.xml" );
         
         DeployMojo mojo = ( DeployMojo ) lookupMojo( "deploy", testPom );
+
+        MockitoAnnotations.initMocks( this );
+
+        ProjectBuildingRequest buildingRequest = mock ( ProjectBuildingRequest.class );
+        when( session.getProjectBuildingRequest() ).thenReturn( buildingRequest );
+        
+        setVariableValueToObject( mojo, "session", session );
         
         assertNotNull( mojo );
         
@@ -467,10 +468,6 @@ public class DeployMojoTest
                               "deploy-test-file-1.0-SNAPSHOT.jar" );
         
         artifact.setFile( file );
-        
-        for( Artifact attachment :project.getAttachedArtifacts() )
-        {}
-        
         
         ArtifactRepositoryStub repo = getRepoStub( mojo );
         
@@ -603,15 +600,17 @@ public class DeployMojoTest
         setVariableValueToObject( mojo, "repositoryLayouts", Collections.singletonMap( "default", repositoryLayout ) );
 
         ArtifactRepository repository = mock( ArtifactRepository.class );
-        when(
-              mojo.createDeploymentArtifactRepository( "altSnapshotDeploymentRepository", "http://localhost",
-                                                       repositoryLayout, true ) ).thenReturn( repository );
+        when( mojo.createDeploymentArtifactRepository( "altSnapshotDeploymentRepository", "http://localhost",
+                                                       repositoryLayout ) ).thenReturn( repository );
 
         project.setVersion( "1.0-SNAPSHOT" );
 
+        ProjectDeployerRequest pdr =
+                        new ProjectDeployerRequest()
+                            .setProject( project )
+                            .setAltDeploymentRepository( "altSnapshotDeploymentRepository::default::http://localhost" );
         assertEquals( repository,
-                      mojo.getDeploymentRepository( project, null, null,
-                                                    "altSnapshotDeploymentRepository::default::http://localhost" ) );
+                      mojo.getDeploymentRepository( pdr ));
     }
 
     public void testAltReleaseDeploymentRepository()
@@ -623,15 +622,18 @@ public class DeployMojoTest
         setVariableValueToObject( mojo, "repositoryLayouts", Collections.singletonMap( "default", repositoryLayout ) );
 
         ArtifactRepository repository = mock( ArtifactRepository.class );
-        when(
-              mojo.createDeploymentArtifactRepository( "altReleaseDeploymentRepository", "http://localhost",
-                                                       repositoryLayout, true ) ).thenReturn( repository );
+        when( mojo.createDeploymentArtifactRepository( "altReleaseDeploymentRepository", "http://localhost",
+                                                       repositoryLayout ) ).thenReturn( repository );
 
         project.setVersion( "1.0" );
 
+        ProjectDeployerRequest pdr =
+                        new ProjectDeployerRequest()
+                            .setProject( project )
+                            .setAltReleaseDeploymentRepository( "altReleaseDeploymentRepository::default::http://localhost" );
+
         assertEquals( repository,
-                      mojo.getDeploymentRepository( project, null,
-                                                    "altReleaseDeploymentRepository::default::http://localhost", null ) );
+                      mojo.getDeploymentRepository( pdr ));
     }
     
     private void addFileToList( File file, List<String> fileList )

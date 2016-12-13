@@ -19,6 +19,17 @@ package org.apache.maven.plugin.compiler;
  * under the License.
  */
 
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.handler.ArtifactHandler;
@@ -58,17 +69,6 @@ import org.codehaus.plexus.compiler.util.scan.mapping.SingleTargetSourceMapping;
 import org.codehaus.plexus.compiler.util.scan.mapping.SourceMapping;
 import org.codehaus.plexus.compiler.util.scan.mapping.SuffixMapping;
 
-import java.io.File;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 /**
  * TODO: At least one step could be optimized, currently the plugin will do two
  * scans of all the source code if the compiler has to have the entire set of
@@ -84,6 +84,13 @@ public abstract class AbstractCompilerMojo
     extends AbstractMojo
 {
 
+    static final String DEFAULT_SOURCE = "1.5";
+    
+    static final String DEFAULT_TARGET = "1.5";
+    
+    // Used to compare with older targets
+    static final String MODULE_INFO_TARGET = "1.9";
+    
     // ----------------------------------------------------------------------
     // Configurables
     // ----------------------------------------------------------------------
@@ -95,6 +102,14 @@ public abstract class AbstractCompilerMojo
      */
     @Parameter( property = "maven.compiler.failOnError", defaultValue = "true" )
     private boolean failOnError = true;
+    
+    /**
+     * Indicates whether the build will continue even if there are compilation warnings.
+     *
+     * @since 3.6
+     */
+    @Parameter( property = "maven.compiler.failOnWarning", defaultValue = "false" )
+    private boolean failOnWarning;  
 
     /**
      * Set to <code>true</code> to include debugging information in the compiled class files.
@@ -129,15 +144,23 @@ public abstract class AbstractCompilerMojo
     /**
      * The -source argument for the Java compiler.
      */
-    @Parameter( property = "maven.compiler.source", defaultValue = "1.5" )
+    @Parameter( property = "maven.compiler.source", defaultValue = DEFAULT_SOURCE )
     protected String source;
 
     /**
      * The -target argument for the Java compiler.
      */
-    @Parameter( property = "maven.compiler.target", defaultValue = "1.5" )
+    @Parameter( property = "maven.compiler.target", defaultValue = DEFAULT_TARGET )
     protected String target;
 
+    /**
+     * The -release argument for the Java compiler, supported since Java9
+     * 
+     * @since 3.6
+     */
+    @Parameter( property = "maven.compiler.release" )
+    protected String release;
+    
     /**
      * The -encoding argument for the Java compiler.
      *
@@ -336,6 +359,18 @@ public abstract class AbstractCompilerMojo
     @Component
     private ToolchainManager toolchainManager;
 
+    /**
+     * <p>
+     * Specify the requirements for this jdk toolchain.
+     * This overrules the toolchain selected by the maven-toolchain-plugin.
+     * </p>
+     * <strong>note:</strong> requires at least Maven 3.3.1
+     * 
+     * @since 3.6
+     */
+    @Parameter
+    private Map<String, String> jdkToolchain;
+
     // ----------------------------------------------------------------------
     // Read-only parameters
     // ----------------------------------------------------------------------
@@ -448,7 +483,11 @@ public abstract class AbstractCompilerMojo
 
     protected abstract List<String> getClasspathElements();
 
+    protected abstract List<String> getModulepathElements();
+
     protected abstract List<String> getCompileSourceRoots();
+    
+    protected abstract void preparePaths( Set<File> sourceFiles );
 
     protected abstract File getOutputDirectory();
 
@@ -456,11 +495,18 @@ public abstract class AbstractCompilerMojo
 
     protected abstract String getTarget();
 
+    protected abstract String getRelease();
+
     protected abstract String getCompilerArgument();
 
     protected abstract Map<String, String> getCompilerArguments();
 
     protected abstract File getGeneratedSourcesDirectory();
+
+    protected final MavenProject getProject()
+    {
+        return project;
+    }
 
     @Override
     public void execute()
@@ -515,13 +561,6 @@ public abstract class AbstractCompilerMojo
             return;
         }
 
-        if ( getLog().isDebugEnabled() )
-        {
-            getLog().debug( "Source directories: " + compileSourceRoots.toString().replace( ',', '\n' ) );
-            getLog().debug( "Classpath: " + getClasspathElements().toString().replace( ',', '\n' ) );
-            getLog().debug( "Output directory: " + getOutputDirectory() );
-        }
-
         // ----------------------------------------------------------------------
         // Create the compiler configuration
         // ----------------------------------------------------------------------
@@ -529,8 +568,6 @@ public abstract class AbstractCompilerMojo
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
 
         compilerConfiguration.setOutputLocation( getOutputDirectory().getAbsolutePath() );
-
-        compilerConfiguration.setClasspathEntries( getClasspathElements() );
 
         compilerConfiguration.setOptimize( optimize );
 
@@ -555,11 +592,15 @@ public abstract class AbstractCompilerMojo
 
         compilerConfiguration.setShowWarnings( showWarnings );
 
+        compilerConfiguration.setFailOnWarning( failOnWarning );
+
         compilerConfiguration.setShowDeprecation( showDeprecation );
 
         compilerConfiguration.setSourceVersion( getSource() );
 
         compilerConfiguration.setTargetVersion( getTarget() );
+        
+        compilerConfiguration.setReleaseVersion( getRelease() );
 
         compilerConfiguration.setProc( proc );
 
@@ -605,49 +646,6 @@ public abstract class AbstractCompilerMojo
         compilerConfiguration.setProcessorPathEntries( resolveProcessorPathEntries() );
 
         compilerConfiguration.setSourceEncoding( encoding );
-
-        Map<String, String> effectiveCompilerArguments = getCompilerArguments();
-
-        String effectiveCompilerArgument = getCompilerArgument();
-
-        if ( ( effectiveCompilerArguments != null ) || ( effectiveCompilerArgument != null )
-                        || ( compilerArgs != null ) )
-        {
-            LinkedHashMap<String, String> cplrArgsCopy = new LinkedHashMap<String, String>();
-            if ( effectiveCompilerArguments != null )
-            {
-                for ( Map.Entry<String, String> me : effectiveCompilerArguments.entrySet() )
-                {
-                    String key = me.getKey();
-                    String value = me.getValue();
-                    if ( !key.startsWith( "-" ) )
-                    {
-                        key = "-" + key;
-                    }
-
-                    if ( key.startsWith( "-A" ) && StringUtils.isNotEmpty( value ) )
-                    {
-                        cplrArgsCopy.put( key + "=" + value, null );
-                    }
-                    else
-                    {
-                        cplrArgsCopy.put( key, value );
-                    }
-                }
-            }
-            if ( !StringUtils.isEmpty( effectiveCompilerArgument ) )
-            {
-                cplrArgsCopy.put( effectiveCompilerArgument, null );
-            }
-            if ( compilerArgs != null )
-            {
-                for ( String arg : compilerArgs )
-                {
-                    cplrArgsCopy.put( arg, null );
-                }
-            }
-            compilerConfiguration.setCustomCompilerArguments( cplrArgsCopy );
-        }
 
         compilerConfiguration.setFork( fork );
 
@@ -740,6 +738,8 @@ public abstract class AbstractCompilerMojo
                 canUpdateTarget = compiler.canUpdateTarget( compilerConfiguration );
 
                 sources = getCompileSources( compiler, compilerConfiguration );
+                
+                preparePaths( sources );
 
                 incrementalBuildHelperRequest = new IncrementalBuildHelperRequest().inputFiles( sources );
 
@@ -793,6 +793,8 @@ public abstract class AbstractCompilerMojo
                 {
                     compilerConfiguration.setSourceFiles( staleSources );
                 }
+                
+                preparePaths( compilerConfiguration.getSourceFiles() );
             }
             catch ( CompilerException e )
             {
@@ -806,10 +808,56 @@ public abstract class AbstractCompilerMojo
                 return;
             }
         }
+        
+        // Dividing pathElements of classPath and modulePath is based on sourceFiles
+        compilerConfiguration.setClasspathEntries( getClasspathElements() );
+
+        compilerConfiguration.setModulepathEntries( getModulepathElements() );
+        
+        Map<String, String> effectiveCompilerArguments = getCompilerArguments();
+
+        String effectiveCompilerArgument = getCompilerArgument();
+
+        if ( ( effectiveCompilerArguments != null ) || ( effectiveCompilerArgument != null )
+                        || ( compilerArgs != null ) )
+        {
+            if ( effectiveCompilerArguments != null )
+            {
+                for ( Map.Entry<String, String> me : effectiveCompilerArguments.entrySet() )
+                {
+                    String key = me.getKey();
+                    String value = me.getValue();
+                    if ( !key.startsWith( "-" ) )
+                    {
+                        key = "-" + key;
+                    }
+
+                    if ( key.startsWith( "-A" ) && StringUtils.isNotEmpty( value ) )
+                    {
+                        compilerConfiguration.addCompilerCustomArgument( key + "=" + value, null );
+                    }
+                    else
+                    {
+                        compilerConfiguration.addCompilerCustomArgument( key, value );
+                    }
+                }
+            }
+            if ( !StringUtils.isEmpty( effectiveCompilerArgument ) )
+            {
+                compilerConfiguration.addCompilerCustomArgument( effectiveCompilerArgument, null );
+            }
+            if ( compilerArgs != null )
+            {
+                for ( String arg : compilerArgs )
+                {
+                    compilerConfiguration.addCompilerCustomArgument( arg, null );
+                }
+            }
+        }
+
         // ----------------------------------------------------------------------
         // Dump configuration
         // ----------------------------------------------------------------------
-
         if ( getLog().isDebugEnabled() )
         {
             getLog().debug( "Classpath:" );
@@ -817,6 +865,15 @@ public abstract class AbstractCompilerMojo
             for ( String s : getClasspathElements() )
             {
                 getLog().debug( " " + s );
+            }
+
+            if ( !getModulepathElements().isEmpty() )
+            {
+                getLog().debug( "Modulepath:" );
+                for ( String s : getModulepathElements() )
+                {
+                    getLog().debug( " " + s );
+                }
             }
 
             getLog().debug( "Source roots:" );
@@ -838,7 +895,7 @@ public abstract class AbstractCompilerMojo
                 }
 
                 String[] cl = compiler.createCommandLine( compilerConfiguration );
-                if ( cl != null && cl.length > 0 )
+                if ( getLog().isDebugEnabled() && cl != null && cl.length > 0 )
                 {
                     StringBuilder sb = new StringBuilder();
                     sb.append( cl[0] );
@@ -1164,10 +1221,53 @@ public abstract class AbstractCompilerMojo
     private Toolchain getToolchain()
     {
         Toolchain tc = null;
-        if ( toolchainManager != null )
+        
+        if ( jdkToolchain != null )
+        {
+            // Maven 3.3.1 has plugin execution scoped Toolchain Support
+            try
+            {
+                Method getToolchainsMethod =
+                    toolchainManager.getClass().getMethod( "getToolchains", MavenSession.class, String.class,
+                                                           Map.class );
+
+                @SuppressWarnings( "unchecked" )
+                List<Toolchain> tcs =
+                    (List<Toolchain>) getToolchainsMethod.invoke( toolchainManager, session, "jdk",
+                                                                  jdkToolchain );
+
+                if ( tcs != null && tcs.size() > 0 )
+                {
+                    tc = tcs.get( 0 );
+                }
+            }
+            catch ( NoSuchMethodException e )
+            {
+                // ignore
+            }
+            catch ( SecurityException e )
+            {
+                // ignore
+            }
+            catch ( IllegalAccessException e )
+            {
+                // ignore
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // ignore
+            }
+            catch ( InvocationTargetException e )
+            {
+                // ignore
+            }
+        }
+        
+        if ( tc == null )
         {
             tc = toolchainManager.getToolchainFromBuildContext( "jdk", session );
         }
+        
         return tc;
     }
 
@@ -1296,11 +1396,15 @@ public abstract class AbstractCompilerMojo
 
         Date buildStartTime = getBuildStartTime();
 
-        for ( String classPathElement : getClasspathElements() )
+        List<String> pathElements = new ArrayList<String>();
+        pathElements.addAll( getClasspathElements() );
+        pathElements.addAll( getModulepathElements() );
+        
+        for ( String pathElement : pathElements )
         {
             // ProjectArtifacts are artifacts which are available in the local project
             // that's the only ones we are interested in now.
-            File artifactPath = new File( classPathElement );
+            File artifactPath = new File( pathElement );
             if ( artifactPath.isDirectory() )
             {
                 if ( hasNewFile( artifactPath, buildStartTime ) )

@@ -38,10 +38,10 @@ ${project.name}
   Your project can build distribution "assemblies" easily, using one of the
   convenient, {{{./descriptor-refs.html}prefabricated assembly descriptors}}.
   These descriptors handle many common operations, such as packaging a project's
-  artifact along with generated documentation into a 
-  {{{./descriptor-refs.html#bin}single zip archive}}. 
-  Alternatively, your project can provide its own {{{./assembly.html}descriptor}} 
-  and assume a much higher level of control over how dependencies, modules, 
+  artifact along with generated documentation into a
+  {{{./descriptor-refs.html#bin}single zip archive}}.
+  Alternatively, your project can provide its own {{{./assembly.html}descriptor}}
+  and assume a much higher level of control over how dependencies, modules,
   file-sets, and individual files are packaged in the assembly.
 
   Currently it can create distributions in the following formats:
@@ -53,6 +53,10 @@ ${project.name}
     * tar.gz (or tgz)
 
     * tar.bz2 (or tbz2)
+
+    * tar.snappy
+
+    * tar.xz (or txz)
 
     * jar
 
@@ -101,25 +105,15 @@ ${project.name}
 * Goals
 
   The main goal in the assembly plugin is the {{{./single-mojo.html}single}} goal. It is used to create all assemblies.
-  <<All other goals are deprecated and will be removed in a future release.>>
 
   For more information about the goals that are available in the Assembly Plugin,
   see {{{./plugin-info.html}the plugin documentation page}}.
 
-  Usage of the <<<assembly:assembly>>>, <<<assembly:attached>>>,
-  <<<assembly:directory>>>, and <<<assembly:directory-inline>>> are <<deprecated>>,
-  since they wreak havoc with normal build processes and promote non-standard
-  build practices.
-
-  The <<<assembly:single-directory>>> goal is redundant, and has been <<deprecated>>
-  in favor of the <<<dir>>> assembly format.
-
-  Finally, the <<<assembly:unpack>>> goal has been <<deprecated>> in favor of the far
-  more comprehensive {{{http://maven.apache.org/plugins/maven-dependency-plugin/}Maven
-  Dependency Plugin}}.
-
 
 * Assembly and Component Descriptor Schemas (XSD)
+
+  * {{{http://maven.apache.org/xsd/assembly-2.0.0.xsd}http://maven.apache.org/xsd/assembly-2.0.0.xsd}},
+    {{{http://maven.apache.org/xsd/assembly-component-2.0.0.xsd}http://maven.apache.org/xsd/assembly-component-2.0.0.xsd}} (for version 3.0 and higher)
 
   * {{{http://maven.apache.org/xsd/assembly-1.1.3.xsd}http://maven.apache.org/xsd/assembly-1.1.3.xsd}},
     {{{http://maven.apache.org/xsd/component-1.1.3.xsd}http://maven.apache.org/xsd/component-1.1.3.xsd}} (for version 2.5.4 and higher)
@@ -142,9 +136,7 @@ ${project.name}
 * Usage
 
   General instructions on how to use the Assembly Plugin can be found on the {{{./usage.html}usage page}}. Some more
-  specific use cases are described in the examples given below. Last but not least, users occasionally contribute
-  additional examples, tips or errata to the
-  {{{http://docs.codehaus.org/display/MAVENUSER/Assembly+Plugin}plugin's wiki page}}.
+  specific use cases are described in the examples given below.
 
   In case you still have questions regarding the plugin's usage, please have a look at the {{{./faq.html}FAQ}} and feel
   free to contact the {{{./mail-lists.html}user mailing list}}. The posts to the mailing list are archived and could

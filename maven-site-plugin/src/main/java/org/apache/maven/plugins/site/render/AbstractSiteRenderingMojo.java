@@ -200,7 +200,7 @@ public abstract class AbstractSiteRenderingMojo
     }
 
     /**
-     * Whether to save Velocity processed Doxia content (<code>*.<ext>.vm</code>)
+     * Whether to save Velocity processed Doxia content (<code>*.&lt;ext&gt;.vm</code>)
      * to <code>${generatedSiteDirectory}/processed</code>.
      *
      * @since 3.5
@@ -317,7 +317,6 @@ public abstract class AbstractSiteRenderingMojo
         }
         else
         {
-            File skinFile;
             try
             {
                 Artifact skinArtifact =
@@ -325,10 +324,8 @@ public abstract class AbstractSiteRenderingMojo
 
                 getLog().info( "Rendering site with " + skinArtifact.getId() + " skin." );
 
-                skinFile = skinArtifact.getFile();
-
-                context = siteRenderer.createContextForSkin( skinFile, attributes, decorationModel, project.getName(),
-                                                             locale );
+                context = siteRenderer.createContextForSkin( skinArtifact, attributes, decorationModel,
+                                                             project.getName(), locale );
             }
             catch ( SiteToolException e )
             {

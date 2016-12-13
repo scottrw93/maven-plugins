@@ -19,12 +19,28 @@ package org.apache.maven.plugins.assembly.artifact;
  * under the License.
  */
 
+import static org.easymock.EasyMock.expect;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.factory.ArtifactFactory;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.repository.ArtifactRepositoryFactory;
+import org.apache.maven.artifact.repository.LegacyLocalRepositoryManager;
 import org.apache.maven.artifact.repository.layout.ArtifactRepositoryLayout;
+import org.apache.maven.execution.DefaultMavenExecutionRequest;
+import org.apache.maven.execution.DefaultMavenExecutionResult;
+import org.apache.maven.execution.MavenExecutionRequest;
+import org.apache.maven.execution.MavenExecutionResult;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Model;
+import org.apache.maven.plugin.testing.stubs.StubArtifactRepository;
 import org.apache.maven.plugins.assembly.AssemblerConfigurationSource;
 import org.apache.maven.plugins.assembly.model.Assembly;
 import org.apache.maven.plugins.assembly.model.DependencySet;
@@ -32,20 +48,16 @@ import org.apache.maven.plugins.assembly.model.ModuleBinaries;
 import org.apache.maven.plugins.assembly.model.ModuleSet;
 import org.apache.maven.plugins.assembly.model.Repository;
 import org.apache.maven.plugins.assembly.resolved.AssemblyId;
+import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.repository.RepositorySystem;
+import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.repository.internal.MavenRepositorySystemSession;
 import org.codehaus.plexus.PlexusTestCase;
 import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.easymock.classextension.EasyMockSupport;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-
-import static org.easymock.EasyMock.expect;
+import org.sonatype.aether.RepositorySystemSession;
+import org.sonatype.aether.repository.LocalRepositoryManager;
 
 public class DefaultDependencyResolverTest
     extends PlexusTestCase
@@ -57,9 +69,7 @@ public class DefaultDependencyResolverTest
 
     private ArtifactRepositoryLayout layout;
 
-    private RepositorySystem resolver;
-
-    private ConsoleLogger logger;
+    private DefaultDependencyResolver resolver;
 
     @Override
     public void setUp()
@@ -67,12 +77,28 @@ public class DefaultDependencyResolverTest
     {
         super.setUp();
 
-        resolver = lookup( RepositorySystem.class );
+        resolver = (DefaultDependencyResolver) lookup( DependencyResolver.class );
+
         factory = lookup( ArtifactFactory.class );
         repoFactory = lookup( ArtifactRepositoryFactory.class );
         layout = lookup( ArtifactRepositoryLayout.class, "default" );
-        logger = new ConsoleLogger( Logger.LEVEL_DEBUG, "test" );
     }
+    
+    protected MavenSession newMavenSession( MavenProject project )
+    {
+        MavenExecutionRequest request = new DefaultMavenExecutionRequest();
+        MavenExecutionResult result = new DefaultMavenExecutionResult();
+
+        MavenRepositorySystemSession repoSession = new MavenRepositorySystemSession();
+        
+        repoSession.setLocalRepositoryManager( LegacyLocalRepositoryManager.wrap( new StubArtifactRepository( "target/local-repo" ),
+                                                                                  null ) );
+        MavenSession session = new MavenSession( getContainer(), repoSession, request, result );
+        session.setCurrentProject( project );
+        session.setProjects( Arrays.asList( project ) );
+        return session;
+    }
+
 
     public void test_getDependencySetResolutionRequirements()
         throws DependencyResolutionException
@@ -90,21 +116,22 @@ public class DefaultDependencyResolverTest
         final ResolutionManagementInfo info = new ResolutionManagementInfo( project );
 
         final Assembly assembly = new Assembly();
-        new DefaultDependencyResolver( resolver, factory, logger ).updateDependencySetResolutionRequirements( ds1, info,
-                                                                                                              AssemblyId.createAssemblyId(
-                                                                                                                  assembly ),
-                                                                                                              project );
+        
+        ProjectBuildingRequest buildingRequest = newMavenSession( project ).getProjectBuildingRequest();
+        
+        resolver.updateDependencySetResolutionRequirements( ds1, info, AssemblyId.createAssemblyId( assembly ),
+                                                            buildingRequest, project );
 
         assertTrue( info.isResolutionRequired() );
         assertFalse( info.isResolvedTransitively() );
 
-        assertTrue( info.getScopeFilter().isIncludeCompileScope() );
-        assertTrue( info.getScopeFilter().isIncludeSystemScope() );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_COMPILE ) );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_SYSTEM ) );
 
-        assertTrue( info.getScopeFilter().isIncludeProvidedScope() );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_PROVIDED ) );
 
-        assertFalse( info.getScopeFilter().isIncludeRuntimeScope() );
-        assertFalse( info.getScopeFilter().isIncludeTestScope() );
+        assertFalse( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_RUNTIME ) );
+        assertFalse( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_TEST ) );
     }
 
     public void test_getModuleSetResolutionRequirements()
@@ -144,10 +171,12 @@ public class DefaultDependencyResolverTest
         allProjects.add( module1b );
         allProjects.add( module2 );
         allProjects.add( module2a );
-
+        
         expect( cs.getReactorProjects() ).andReturn( allProjects ).anyTimes();
 
         expect( cs.getProject() ).andReturn( project ).anyTimes();
+        
+        expect( cs.getMavenSession() ).andReturn( newMavenSession( project ) ).anyTimes();
 
         final ResolutionManagementInfo info = new ResolutionManagementInfo( project );
 
@@ -185,7 +214,6 @@ public class DefaultDependencyResolverTest
 
         mm.replayAll();
 
-        final DefaultDependencyResolver resolver = new DefaultDependencyResolver( this.resolver, factory, logger );
         resolver.enableLogging( new ConsoleLogger( Logger.LEVEL_DEBUG, "test" ) );
 
         final Assembly assembly = new Assembly();
@@ -209,13 +237,13 @@ public class DefaultDependencyResolverTest
         assertTrue( enabledProjects.contains( module2a ) );
 
         // these are the two we directly set above.
-        assertTrue( info.getScopeFilter().isIncludeTestScope() );
-        assertTrue( info.getScopeFilter().isIncludeCompileScope() );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_TEST ) );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_COMPILE ) );
 
         // this combination should be implied by the two direct scopes set above.
-        assertTrue( info.getScopeFilter().isIncludeRuntimeScope() );
-        assertTrue( info.getScopeFilter().isIncludeProvidedScope() );
-        assertTrue( info.getScopeFilter().isIncludeSystemScope() );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_RUNTIME ) );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_PROVIDED ) );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_SYSTEM ) );
 
         mm.verifyAll();
     }
@@ -241,18 +269,18 @@ public class DefaultDependencyResolverTest
         assembly.setRepositories( repositories );
 
         final ResolutionManagementInfo info = new ResolutionManagementInfo( project );
-        new DefaultDependencyResolver( resolver, factory, logger ).updateRepositoryResolutionRequirements( assembly,
+        resolver.updateRepositoryResolutionRequirements( assembly,
                                                                                                            info );
 
         assertTrue( info.isResolutionRequired() );
 
-        assertTrue( info.getScopeFilter().isIncludeCompileScope() );
-        assertTrue( info.getScopeFilter().isIncludeSystemScope() );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_COMPILE ) );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_SYSTEM ) );
 
-        assertTrue( info.getScopeFilter().isIncludeProvidedScope() );
+        assertTrue( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_PROVIDED ) );
 
-        assertFalse( info.getScopeFilter().isIncludeRuntimeScope() );
-        assertFalse( info.getScopeFilter().isIncludeTestScope() );
+        assertFalse( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_RUNTIME ) );
+        assertFalse( info.getScopeFilter().getIncluded().contains( Artifact.SCOPE_TEST ) );
     }
 
     public void test_aggregateRemoteArtifactRepositories()
@@ -281,8 +309,7 @@ public class DefaultDependencyResolverTest
         project.setRemoteArtifactRepositories( projectRepos );
 
         final List<ArtifactRepository> aggregated =
-            new DefaultDependencyResolver( resolver, factory, logger ).aggregateRemoteArtifactRepositories(
-                externalRepos, Collections.singleton( project ) );
+            resolver.aggregateRemoteArtifactRepositories( externalRepos, Collections.singleton( project ) );
 
         assertRepositoryWithId( er1.getId(), aggregated, true );
         assertRepositoryWithId( er2.getId(), aggregated, true );

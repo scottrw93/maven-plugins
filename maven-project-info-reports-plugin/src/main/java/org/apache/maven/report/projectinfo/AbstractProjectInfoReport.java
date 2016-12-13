@@ -115,7 +115,8 @@ public abstract class AbstractProjectInfoReport
     private I18N i18n;
 
     /**
-     * Project builder.
+     * Project builder (deprecated in Maven 3: should use ProjectBuilder, which will avoid
+     * issues like DOXIASITETOOLS-166)
      */
     @Component
     protected MavenProjectBuilder mavenProjectBuilder;
@@ -153,6 +154,14 @@ public abstract class AbstractProjectInfoReport
     protected List<ArtifactRepository> remoteRepositories;
 
     /**
+     * The reactor projects.
+     * 
+     * @since 2.10
+     */
+    @Parameter( defaultValue = "${reactorProjects}", required = true, readonly = true )
+    protected List<MavenProject> reactorProjects;
+
+    /**
      * The current user system settings for use in Maven.
      *
      * @since 2.3
@@ -178,8 +187,8 @@ public abstract class AbstractProjectInfoReport
     private boolean skip;
 
     /**
-     * Skip the project info report generation if a report-specific section of the POM is empty.
-     * Defaults to <code>true</code>.
+     * Skip the project info report generation if a report-specific section of the POM is empty. Defaults to
+     * <code>true</code>.
      *
      * @since 2.8
      */
@@ -222,10 +231,8 @@ public abstract class AbstractProjectInfoReport
             Artifact defaultSkin =
                 siteTool.getDefaultSkinArtifact( localRepository, project.getRemoteArtifactRepositories() );
 
-            // CHECKSTYLE_OFF: LineLength
-            SiteRenderingContext siteContext =
-                siteRenderer.createContextForSkin( defaultSkin.getFile(), attributes, model, getName( locale ), locale );
-            // CHECKSTYLE_ON: LineLength
+            SiteRenderingContext siteContext = siteRenderer.createContextForSkin( defaultSkin.getFile(), attributes,
+                                                                                  model, getName( locale ), locale );
 
             RenderingContext context = new RenderingContext( outputDirectory, filename );
 
@@ -241,6 +248,9 @@ public abstract class AbstractProjectInfoReport
 
             siteRenderer.copyResources( siteContext, new File( project.getBasedir(), "src/site/resources" ),
                                         outputDirectory );
+
+            writer.close();
+            writer = null;
         }
         catch ( RendererException e )
         {
@@ -309,6 +319,16 @@ public abstract class AbstractProjectInfoReport
     protected MavenProject getProject()
     {
         return project;
+    }
+
+    /**
+     * Reactor projects
+     * 
+     * @return List of projects
+     */
+    protected List<MavenProject> getReactorProjects()
+    {
+        return reactorProjects;
     }
 
     /**
@@ -451,7 +471,7 @@ public abstract class AbstractProjectInfoReport
             }
             catch ( MalformedURLException e )
             {
-                //could not happen.
+                // could not happen.
             }
 
             this.bundle = ResourceBundle.getBundle( this.bundleName, locale, classLoader );
@@ -558,7 +578,7 @@ public abstract class AbstractProjectInfoReport
             }
             catch ( final IOException e )
             {
-                //In which cases could this happen? And what should we do?
+                // In which cases could this happen? And what should we do?
             }
 
             interpolator.addValueSource( new PropertiesBasedValueSource( System.getProperties() ) );
@@ -573,7 +593,7 @@ public abstract class AbstractProjectInfoReport
             }
             catch ( final InterpolationException e )
             {
-                //What does this exception mean?
+                // What does this exception mean?
             }
 
             return value;

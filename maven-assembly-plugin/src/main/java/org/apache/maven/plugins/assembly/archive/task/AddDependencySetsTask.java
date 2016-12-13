@@ -19,8 +19,16 @@ package org.apache.maven.plugins.assembly.archive.task;
  * under the License.
  */
 
+import java.io.File;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.execution.MavenSession;
+import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.plugins.assembly.AssemblerConfigurationSource;
@@ -38,20 +46,13 @@ import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectBuildingResult;
-import org.apache.maven.shared.artifact.filter.ScopeArtifactFilter;
+import org.apache.maven.shared.artifact.filter.resolve.ScopeFilter;
+import org.apache.maven.shared.artifact.filter.resolve.transform.ArtifactIncludeFilterTransformer;
 import org.codehaus.plexus.archiver.Archiver;
 import org.codehaus.plexus.archiver.ArchiverException;
 import org.codehaus.plexus.components.io.functions.InputStreamTransformer;
 import org.codehaus.plexus.interpolation.fixed.FixedStringSearchInterpolator;
 import org.codehaus.plexus.logging.Logger;
-
-import java.io.File;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
 
 /**
  * @version $Id$
@@ -179,12 +180,7 @@ public class AddDependencySetsTask
 
     private ProjectBuildingRequest getProjectBuildingRequest( AssemblerConfigurationSource configSource )
     {
-        MavenSession session = configSource.getMavenSession();
-        ProjectBuildingRequest pbr = ProjectBuildingRequestCreator.create( session );
-        pbr.setRemoteRepositories( configSource.getRemoteRepositories() );
-        pbr.setLocalRepository( configSource.getLocalRepository() );
-        //pbr.setRepositorySession(  configSource.getR''  )
-        return pbr;
+        return configSource.getMavenSession().getProjectBuildingRequest();
     }
 
     private boolean isUnpackWithOptions( DependencySet dependencySet )
@@ -337,8 +333,10 @@ public class AddDependencySetsTask
             logger.debug( "Filtering dependency artifacts WITHOUT transitive dependency path information." );
         }
 
-        final ScopeArtifactFilter filter = new ScopeArtifactFilter( dependencySet.getScope() );
+        final ScopeFilter scopeFilter = FilterUtils.newScopeFilter( dependencySet.getScope() );
 
+        final ArtifactFilter filter = new ArtifactIncludeFilterTransformer().transform( scopeFilter );
+        
         FilterUtils.filterArtifacts( dependencyArtifacts, dependencySet.getIncludes(), dependencySet.getExcludes(),
                                      dependencySet.isUseStrictFiltering(), dependencySet.isUseTransitiveFiltering(),
                                      logger, filter );

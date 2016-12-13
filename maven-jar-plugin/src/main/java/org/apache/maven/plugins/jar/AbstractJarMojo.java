@@ -70,7 +70,7 @@ public abstract class AbstractJarMojo
     /**
      * Name of the generated JAR.
      */
-    @Parameter( alias = "jarName", property = "jar.finalName", defaultValue = "${project.build.finalName}" )
+    @Parameter( defaultValue = "${project.build.finalName}", readonly = true )
     private String finalName;
 
     /**
@@ -99,20 +99,11 @@ public abstract class AbstractJarMojo
     private MavenArchiveConfiguration archive = new MavenArchiveConfiguration();
 
     /**
-     * Path to the default MANIFEST file to use. It will be used if <code>useDefaultManifestFile</code> is set to
-     * <code>true</code>.
-     *
-     * @since 2.2
-     */
-    // CHECKSTYLE_OFF: LineLength
-    @Parameter( defaultValue = "${project.build.outputDirectory}/META-INF/MANIFEST.MF", required = true, readonly = true )
-    // CHECKSTYLE_ON: LineLength
-    private File defaultManifestFile;
-
-    /**
-     * Set this to <code>true</code> to enable the use of the <code>defaultManifestFile</code>.
-     *
-     * @since 2.2
+     * Using this property will fail your build cause it has been removed from the plugin configuration. See the
+     * <a href="https://maven.apache.org/plugins/maven-jar-plugin/">Major Version Upgrade to version 3.0.0</a> for the
+     * plugin.
+     * 
+     * @deprecated For version 3.0.0 this parameter is only defined here to break the build if you use it!
      */
     @Parameter( property = "jar.useDefaultManifestFile", defaultValue = "false" )
     private boolean useDefaultManifestFile;
@@ -130,22 +121,28 @@ public abstract class AbstractJarMojo
      * configured to post-process the jar. This plugin can not detect the post-processing, and so leaves the
      * post-processed jar in place. This can lead to failures when those plugins do not expect to find their own output
      * as an input. Set this parameter to <tt>true</tt> to avoid these problems by forcing this plugin to recreate the
-     * jar every time.
+     * jar every time.<br/>
+     * Starting with <b>3.0.0</b> the property has been renamed from <code>jar.forceCreation</code> to
+     * <code>maven.jar.forceCreation</code>.
      */
-    @Parameter( property = "jar.forceCreation", defaultValue = "false" )
+    @Parameter( property = "maven.jar.forceCreation", defaultValue = "false" )
     private boolean forceCreation;
 
     /**
-     * Skip creating empty archives
+     * Skip creating empty archives.
      */
-    @Parameter( property = "jar.skipIfEmpty", defaultValue = "false" )
+    @Parameter( defaultValue = "false" )
     private boolean skipIfEmpty;
 
     /**
      * Return the specific output directory to serve as the root for the archive.
+     * @return get classes directory.
      */
     protected abstract File getClassesDirectory();
 
+    /**
+     * @return the {@link #project}
+     */
     protected final MavenProject getProject()
     {
         return project;
@@ -153,35 +150,36 @@ public abstract class AbstractJarMojo
 
     /**
      * Overload this to produce a jar with another classifier, for example a test-jar.
+     * @return get the classifier.
      */
     protected abstract String getClassifier();
 
     /**
      * Overload this to produce a test-jar, for example.
+     * @return return the type.
      */
     protected abstract String getType();
 
-    
     /**
      * Returns the Jar file to generate, based on an optional classifier.
      *
      * @param basedir the output directory
-     * @param finalName the name of the ear file
+     * @param resultFinalName the name of the ear file
      * @param classifier an optional classifier
      * @return the file to generate
      */
-    protected File getJarFile( File basedir, String finalName, String classifier )
+    protected File getJarFile( File basedir, String resultFinalName, String classifier )
     {
         if ( basedir == null )
         {
             throw new IllegalArgumentException( "basedir is not allowed to be null" );
         }
-        if ( finalName == null )
+        if ( resultFinalName == null )
         {
             throw new IllegalArgumentException( "finalName is not allowed to be null" );
         }
 
-        StringBuilder fileName = new StringBuilder( finalName );
+        StringBuilder fileName = new StringBuilder( resultFinalName );
 
         if ( hasClassifier() )
         {
@@ -194,17 +192,9 @@ public abstract class AbstractJarMojo
     }
 
     /**
-     * Default Manifest location. Can point to a non existing file. Cannot return null.
-     */
-    protected File getDefaultManifestFile()
-    {
-        return defaultManifestFile;
-    }
-
-    /**
      * Generates the JAR.
-     *
-     * @todo Add license files in META-INF directory.
+     * @return The instance of File for the created archive file.
+     * @throws MojoExecutionException in case of an error.
      */
     public File createArchive()
         throws MojoExecutionException
@@ -231,14 +221,6 @@ public abstract class AbstractJarMojo
                 archiver.getArchiver().addDirectory( contentDirectory, getIncludes(), getExcludes() );
             }
 
-            File existingManifest = getDefaultManifestFile();
-
-            if ( useDefaultManifestFile && existingManifest.exists() && archive.getManifestFile() == null )
-            {
-                getLog().info( "Adding existing MANIFEST to archive. Found under: " + existingManifest.getPath() );
-                archive.setManifestFile( existingManifest );
-            }
-
             archiver.createArchive( session, project, archive );
 
             return jarFile;
@@ -252,11 +234,18 @@ public abstract class AbstractJarMojo
 
     /**
      * Generates the JAR.
-     *
+     * @throws MojoExecutionException in case of an error.
      */
     public void execute()
         throws MojoExecutionException
     {
+        if ( useDefaultManifestFile )
+        {
+            throw new MojoExecutionException( "You are using 'useDefaultManifestFile' which has been removed"
+                + " from the maven-jar-plugin. "
+                + "Please see the >>Major Version Upgrade to version 3.0.0<< on the plugin site." );
+        }
+
         if ( skipIfEmpty && ( !getClassesDirectory().exists() || getClassesDirectory().list().length < 1 ) )
         {
             getLog().info( "Skipping packaging of the " + getType() );

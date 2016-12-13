@@ -479,7 +479,8 @@ public class DefaultAssemblyReaderTest
             final ComponentXpp3Writer componentWriter = new ComponentXpp3Writer();
 
             componentWriter.write( writer, component );
-            writer.flush();
+            writer.close();
+            writer = null;
         }
         finally
         {
@@ -559,50 +560,6 @@ public class DefaultAssemblyReaderTest
 
         expect( configSource.getProject() ).andReturn( project ).anyTimes();
 
-        expect( configSource.isSiteIncluded() ).andReturn( false ).anyTimes();
-        DefaultAssemblyArchiverTest.setupInterpolators( configSource );
-
-        mockManager.replayAll();
-
-        final Assembly result = new DefaultAssemblyReader().readAssembly( sr, "testLocation", null, configSource );
-
-        assertEquals( assembly.getId(), result.getId() );
-
-        final List<FileSet> fileSets = result.getFileSets();
-
-        assertEquals( 1, fileSets.size() );
-
-        assertEquals( "/site", fileSets.get( 0 ).getOutputDirectory() );
-
-        mockManager.verifyAll();
-    }
-
-    public void testReadAssembly_ShouldReadAssemblyWithSiteDirInclusionFromConfigWithoutComponentsOrInterpolation()
-        throws IOException, AssemblyReadException, InvalidAssemblerConfigurationException
-    {
-        final Assembly assembly = new Assembly();
-        assembly.setId( "test" );
-
-        final StringReader sr = writeToStringReader( assembly );
-
-        final File siteDir = fileManager.createTempDir();
-
-        expect( configSource.getSiteDirectory() ).andReturn( siteDir ).anyTimes();
-
-        final File basedir = fileManager.createTempDir();
-
-        expect( configSource.getBasedir() ).andReturn( basedir ).anyTimes();
-
-        final Model model = new Model();
-        model.setGroupId( "group" );
-        model.setArtifactId( "artifact" );
-        model.setVersion( "version" );
-
-        final MavenProject project = new MavenProject( model );
-
-        expect( configSource.getProject() ).andReturn( project ).anyTimes();
-
-        expect( configSource.isSiteIncluded() ).andReturn( true ).anyTimes();
         DefaultAssemblyArchiverTest.setupInterpolators( configSource );
 
         mockManager.replayAll();
@@ -641,6 +598,8 @@ public class DefaultAssemblyReaderTest
         {
             fw = new OutputStreamWriter( new FileOutputStream( componentsFile ), "UTF-8" );
             new ComponentXpp3Writer().write( fw, component );
+            fw.close();
+            fw = null;
         }
         finally
         {
@@ -664,7 +623,6 @@ public class DefaultAssemblyReaderTest
         final MavenProject project = new MavenProject( model );
         expect( configSource.getProject() ).andReturn( project ).anyTimes();
 
-        expect( configSource.isSiteIncluded() ).andReturn( false ).anyTimes();
         DefaultAssemblyArchiverTest.setupInterpolators( configSource );
 
         mockManager.replayAll();
@@ -704,6 +662,8 @@ public class DefaultAssemblyReaderTest
         {
             fw = new OutputStreamWriter( new FileOutputStream( componentsFile ), "UTF-8" );
             new ComponentXpp3Writer().write( fw, component );
+            fw.close();
+            fw = null;
         }
         finally
         {
@@ -728,7 +688,6 @@ public class DefaultAssemblyReaderTest
 
         expect( configSource.getProject() ).andReturn( project ).atLeastOnce();
 
-        expect( configSource.isSiteIncluded() ).andReturn( false );
         DefaultAssemblyArchiverTest.setupInterpolators( configSource );
 
         mockManager.replayAll();
@@ -777,8 +736,6 @@ public class DefaultAssemblyReaderTest
 
         expect( configSource.getProject() ).andReturn( project ).anyTimes();
 
-        expect( configSource.isSiteIncluded() ).andReturn( false ).anyTimes();
-
         DefaultAssemblyArchiverTest.setupInterpolators( configSource );
 
         mockManager.replayAll();
@@ -805,8 +762,6 @@ public class DefaultAssemblyReaderTest
 
         expect( configSource.getProject() ).andReturn( new MavenProject( new Model() ) ).anyTimes();
 
-        expect( configSource.isSiteIncluded() ).andReturn( false ).anyTimes();
-
         DefaultAssemblyArchiverTest.setupInterpolators( configSource );
 
         Writer writer = null;
@@ -814,6 +769,8 @@ public class DefaultAssemblyReaderTest
         {
             writer = new OutputStreamWriter( new FileOutputStream( assemblyFile ), "UTF-8" );
             new AssemblyXpp3Writer().write( writer, assembly );
+            writer.close();
+            writer = null;
         }
         finally
         {
@@ -837,8 +794,6 @@ public class DefaultAssemblyReaderTest
         expect( configSource.getBasedir() ).andReturn( basedir ).anyTimes();
 
         expect( configSource.getProject() ).andReturn( new MavenProject( new Model() ) ).anyTimes();
-
-        expect( configSource.isSiteIncluded() ).andReturn( false ).anyTimes();
 
         expect( configSource.isIgnoreMissingDescriptor() ).andReturn( false ).anyTimes();
 
@@ -870,7 +825,7 @@ public class DefaultAssemblyReaderTest
 
         final String assemblyFile = files.get( 0 );
 
-        final List<Assembly> assemblies = performReadAssemblies( basedir, assemblyFile, null, null, null, null );
+        final List<Assembly> assemblies = performReadAssemblies( basedir, new String[] { assemblyFile }, null, null );
 
         assertNotNull( assemblies );
         assertEquals( 1, assemblies.size() );
@@ -890,7 +845,7 @@ public class DefaultAssemblyReaderTest
 
         try
         {
-            performReadAssemblies( basedir, assemblyFile.getAbsolutePath(), null, null, null, null, false );
+            performReadAssemblies( basedir, null, null, null, false );
 
             fail( "Should fail when descriptor file is missing and ignoreDescriptors == false" );
         }
@@ -910,28 +865,13 @@ public class DefaultAssemblyReaderTest
 
         try
         {
-            performReadAssemblies( basedir, assemblyFile.getAbsolutePath(), null, null, null, null, true );
+            performReadAssemblies( basedir, null, null, null, true );
         }
         catch ( final AssemblyReadException e )
         {
             fail( "Setting ignoreMissingDescriptor == true (true flag in performReadAssemblies, above) should NOT "
                       + "produce an exception." );
         }
-    }
-
-    public void testReadAssemblies_ShouldGetAssemblyDescriptorFromSingleRef()
-        throws IOException, AssemblyReadException, InvalidAssemblerConfigurationException
-    {
-        final File basedir = fileManager.createTempDir();
-
-        final List<Assembly> assemblies = performReadAssemblies( basedir, null, "bin", null, null, null );
-
-        assertNotNull( assemblies );
-        assertEquals( 1, assemblies.size() );
-
-        final Assembly result = assemblies.get( 0 );
-
-        assertEquals( "bin", result.getId() );
     }
 
     public void testReadAssemblies_ShouldGetAssemblyDescriptorFromFileArray()
@@ -952,7 +892,7 @@ public class DefaultAssemblyReaderTest
         final List<String> files = writeAssembliesToFile( assemblies, basedir );
 
         final List<Assembly> results =
-            performReadAssemblies( basedir, null, null, files.toArray( new String[files.size()] ), null, null );
+            performReadAssemblies( basedir, files.toArray( new String[files.size()] ), null, null );
 
         assertNotNull( results );
         assertEquals( 2, results.size() );
@@ -972,7 +912,7 @@ public class DefaultAssemblyReaderTest
         final File basedir = fileManager.createTempDir();
 
         final List<Assembly> assemblies =
-            performReadAssemblies( basedir, null, null, null, new String[]{ "bin", "src" }, null );
+            performReadAssemblies( basedir, null, new String[]{ "bin", "src" }, null );
 
         assertNotNull( assemblies );
         assertEquals( 2, assemblies.size() );
@@ -1003,7 +943,7 @@ public class DefaultAssemblyReaderTest
 
         writeAssembliesToFile( assemblies, basedir );
 
-        final List<Assembly> results = performReadAssemblies( basedir, null, null, null, null, basedir );
+        final List<Assembly> results = performReadAssemblies( basedir, null, null, basedir );
 
         assertNotNull( results );
         assertEquals( 2, results.size() );
@@ -1036,7 +976,7 @@ public class DefaultAssemblyReaderTest
 
         fileManager.createFile( basedir, "readme.txt", "This is just a readme file, not a descriptor." );
 
-        final List<Assembly> results = performReadAssemblies( basedir, null, null, null, null, basedir );
+        final List<Assembly> results = performReadAssemblies( basedir, null, null, basedir );
 
         assertNotNull( results );
         assertEquals( 2, results.size() );
@@ -1064,6 +1004,8 @@ public class DefaultAssemblyReaderTest
             {
                 writer = new OutputStreamWriter( new FileOutputStream( assemblyFile ), "UTF-8" );
                 new AssemblyXpp3Writer().write( writer, assembly );
+                writer.close();
+                writer = null;
             }
             finally
             {
@@ -1076,25 +1018,18 @@ public class DefaultAssemblyReaderTest
         return files;
     }
 
-    private List<Assembly> performReadAssemblies( final File basedir, final String descriptor,
-                                                  final String descriptorRef, final String[] descriptors,
+    private List<Assembly> performReadAssemblies( final File basedir, final String[] descriptors,
                                                   final String[] descriptorRefs, final File descriptorDir )
         throws AssemblyReadException, InvalidAssemblerConfigurationException
     {
-        return performReadAssemblies( basedir, descriptor, descriptorRef, descriptors, descriptorRefs, descriptorDir,
-                                      false );
+        return performReadAssemblies( basedir, descriptors, descriptorRefs, descriptorDir, false );
     }
 
-    private List<Assembly> performReadAssemblies( final File basedir, final String descriptor,
-                                                  final String descriptorRef, final String[] descriptors,
+    private List<Assembly> performReadAssemblies( final File basedir, final String[] descriptors,
                                                   final String[] descriptorRefs, final File descriptorDir,
                                                   final boolean ignoreMissing )
         throws AssemblyReadException, InvalidAssemblerConfigurationException
     {
-        expect( configSource.getDescriptor() ).andReturn( descriptor );
-
-        expect( configSource.getDescriptorId() ).andReturn( descriptorRef );
-
         expect( configSource.getDescriptorReferences() ).andReturn( descriptorRefs );
 
         expect( configSource.getDescriptors() ).andReturn( descriptors );
@@ -1104,8 +1039,6 @@ public class DefaultAssemblyReaderTest
         expect( configSource.getBasedir() ).andReturn( basedir ).anyTimes();
 
         expect( configSource.getProject() ).andReturn( new MavenProject( new Model() ) ).anyTimes();
-
-        expect( configSource.isSiteIncluded() ).andReturn( false ).anyTimes();
 
         expect( configSource.isIgnoreMissingDescriptor() ).andReturn( ignoreMissing ).anyTimes();
         DefaultAssemblyArchiverTest.setupInterpolators( configSource );

@@ -34,7 +34,6 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.dependency.AbstractDependencyMojo;
 import org.apache.maven.plugins.dependency.utils.DependencyUtil;
 import org.apache.maven.plugins.dependency.utils.filters.ArtifactItemFilter;
-import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.shared.artifact.DefaultArtifactCoordinate;
@@ -89,7 +88,7 @@ public abstract class AbstractFromConfigurationMojo
 
     /**
      * Collection of ArtifactItems to work on. (ArtifactItem contains groupId, artifactId, version, type, classifier,
-     * outputDirectory, destFileName and overWrite.) See <a href="./usage.html">Usage</a> for details.
+     * outputDirectory, destFileName, overWrite and encoding.) See <a href="./usage.html">Usage</a> for details.
      *
      * @since 1.0
      */
@@ -220,19 +219,14 @@ public abstract class AbstractFromConfigurationMojo
              * ResolutionNode node = (ResolutionNode) iter.next(); artifact = node.getArtifact(); }
              */
             
-            ProjectBuildingRequest buildingRequest;
+            ProjectBuildingRequest buildingRequest = newResolveArtifactProjectBuildingRequest();
             
             if ( localRepositoryDirectory != null )
             {
                 buildingRequest =
-                    repositoryManager.setLocalRepositoryBasedir( session.getProjectBuildingRequest(),
-                                                                 localRepositoryDirectory );
+                    repositoryManager.setLocalRepositoryBasedir( buildingRequest, localRepositoryDirectory );
             }
-            else
-            {
-                buildingRequest = new DefaultProjectBuildingRequest( session.getProjectBuildingRequest() );
-            }
-            
+
             // Map dependency to artifact coordinate
             DefaultArtifactCoordinate coordinate = new DefaultArtifactCoordinate();
             coordinate.setGroupId( artifactItem.getGroupId() );

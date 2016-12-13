@@ -23,6 +23,10 @@ package org.apache.maven.plugins.dependency.utils;
  *
  */
 
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -215,8 +219,26 @@ public class DependencyStatusSets
                 optionalMarker = " (optional) ";
             }
 
+            String moduleNameMarker = "";
+
+            // dependencies:collect won't download jars
+            if ( artifact.getFile() != null )
+            {
+                ModuleDescriptor moduleDescriptor = getModuleDescriptor( artifact.getFile() );
+                if ( moduleDescriptor != null )
+                {
+                    moduleNameMarker = " -- module " + moduleDescriptor.name;
+
+                    if ( moduleDescriptor.automatic )
+                    {
+                        moduleNameMarker += " (auto)";
+                    }
+                }
+            }
+
             artifactStringList.add( "   " + id + ( outputAbsoluteArtifactFilename ? ":" + artifactFilename : "" )
                 + optionalMarker
+                + moduleNameMarker
                 + "\n" );
         }
         if ( sort )
@@ -229,4 +251,68 @@ public class DependencyStatusSets
         }
         return sb;
     }
+    
+    private ModuleDescriptor getModuleDescriptor( File artifactFile )
+    {
+        ModuleDescriptor moduleDescriptor = null;
+        try
+        {
+            // Use Java9 code to get moduleName, don't try to do it better with own implementation
+            Class moduleFinderClass = Class.forName( "java.lang.module.ModuleFinder" );
+
+            java.nio.file.Path path = artifactFile.toPath();
+            
+            Method ofMethod = moduleFinderClass.getDeclaredMethod( "of", java.nio.file.Path[].class );
+            Object moduleFinderInstance = ofMethod.invoke( null, new Object[] { new java.nio.file.Path[] { path } } );
+            
+            Method findAllMethod = moduleFinderClass.getDeclaredMethod( "findAll" );
+            Set<Object> moduleReferences = (Set<Object>) findAllMethod.invoke( moduleFinderInstance );
+            
+            Object moduleReference = moduleReferences.iterator().next();
+            Method descriptorMethod = moduleReference.getClass().getDeclaredMethod( "descriptor" );
+            Object moduleDescriptorInstance = descriptorMethod.invoke( moduleReference );
+            
+            Method nameMethod = moduleDescriptorInstance.getClass().getDeclaredMethod( "name" );
+            String name = (String) nameMethod.invoke( moduleDescriptorInstance );
+            
+            moduleDescriptor = new ModuleDescriptor();
+            moduleDescriptor.name = name;
+            
+            Method isAutomaticMethod = moduleDescriptorInstance.getClass().getDeclaredMethod( "isAutomatic" );
+            moduleDescriptor.automatic = (Boolean) isAutomaticMethod.invoke( moduleDescriptorInstance );
+        }
+        catch ( ClassNotFoundException e )
+        {
+            // do nothing
+        }
+        catch ( NoSuchMethodException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( SecurityException e )
+        {
+            // do nothing
+        }
+        catch ( IllegalAccessException e )
+        {
+            // do nothing
+        }
+        catch ( IllegalArgumentException e )
+        {
+            // do nothing
+        }
+        catch ( InvocationTargetException e )
+        {
+            // do nothing
+        }
+        return moduleDescriptor;
+    }
+    
+    private class ModuleDescriptor
+    {
+        String name;
+        
+        boolean automatic = true;
+    }
+    
 }

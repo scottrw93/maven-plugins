@@ -34,5 +34,5 @@ under the License.
   <packaging>jar</packaging>
 
   <name>site-attach-descriptor IT for jar</name>
-  <description>the site descriptor should not be attached: only when packaging = pom, see http://jira.codehaus.org/browse/MSITE-597</description>
+  <description>the site descriptor should not be attached: only when packaging = pom, see https://issues.apache.org/jira/browse/MSITE-597</description>
 </project>

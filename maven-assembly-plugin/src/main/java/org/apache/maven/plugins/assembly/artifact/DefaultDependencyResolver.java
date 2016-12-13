@@ -19,8 +19,16 @@ package org.apache.maven.plugins.assembly.artifact;
  * under the License.
  */
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.factory.ArtifactFactory;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
@@ -37,22 +45,16 @@ import org.apache.maven.plugins.assembly.model.Repository;
 import org.apache.maven.plugins.assembly.resolved.AssemblyId;
 import org.apache.maven.plugins.assembly.utils.FilterUtils;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.project.artifact.InvalidDependencyVersionException;
+import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.repository.RepositorySystem;
+import org.apache.maven.shared.artifact.filter.resolve.ScopeFilter;
+import org.apache.maven.shared.artifact.filter.resolve.transform.ArtifactIncludeFilterTransformer;
+import org.apache.maven.shared.artifact.resolve.ArtifactResult;
+import org.apache.maven.shared.dependencies.resolve.DependencyResolverException;
 import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.AbstractLogEnabled;
-import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.util.StringUtils;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * @author jdcasey
@@ -63,27 +65,11 @@ public class DefaultDependencyResolver
     extends AbstractLogEnabled
     implements DependencyResolver
 {
-
     @Requirement
     private RepositorySystem resolver;
-
-
+    
     @Requirement
-    private ArtifactFactory factory;
-
-    @SuppressWarnings( "UnusedDeclaration" )
-    public DefaultDependencyResolver()
-    {
-        // for plexus init
-    }
-
-    protected DefaultDependencyResolver( final RepositorySystem resolver, final ArtifactFactory factory,
-                                         final Logger logger )
-    {
-        this.resolver = resolver;
-        this.factory = factory;
-        enableLogging( logger );
-    }
+    private org.apache.maven.shared.dependencies.resolve.DependencyResolver dependencyResolver;
 
     @Override
     public Map<DependencySet, Set<Artifact>> resolveDependencySets( final Assembly assembly, ModuleSet moduleSet,
@@ -101,7 +87,9 @@ public class DefaultDependencyResolver
             final ResolutionManagementInfo info = new ResolutionManagementInfo( currentProject );
             updateRepositoryResolutionRequirements( assembly, info );
             final AssemblyId assemblyId = AssemblyId.createAssemblyId( assembly );
-            updateDependencySetResolutionRequirements( dependencySet, info, assemblyId, currentProject );
+            updateDependencySetResolutionRequirements( dependencySet, info, assemblyId,
+                                                       configSource.getMavenSession().getProjectBuildingRequest(),
+                                                       currentProject );
             updateModuleSetResolutionRequirements( assemblyId, moduleSet, dependencySet, info, configSource );
 
             resolve( assembly, configSource, result, dependencySet, info );
@@ -125,7 +113,9 @@ public class DefaultDependencyResolver
             if ( info.isResolvedTransitively() )
             {
                 getLogger().debug( "Resolving project dependencies transitively." );
-                artifacts = resolveTransitively( artifacts, repos, info, configSource );
+                
+                ArtifactFilter filter = new ArtifactIncludeFilterTransformer().transform( info.getScopeFilter() );
+                artifacts = resolveTransitively( artifacts, repos, filter, configSource );
             }
             else
             {
@@ -157,7 +147,9 @@ public class DefaultDependencyResolver
             final ResolutionManagementInfo info = new ResolutionManagementInfo( currentProject );
             updateRepositoryResolutionRequirements( assembly, info );
             final AssemblyId assemblyId = AssemblyId.createAssemblyId( assembly );
-            updateDependencySetResolutionRequirements( dependencySet, info, assemblyId, currentProject );
+            updateDependencySetResolutionRequirements( dependencySet, info, assemblyId,
+                                                       configSource.getMavenSession().getProjectBuildingRequest(),
+                                                       currentProject );
 
             resolve( assembly, configSource, result, dependencySet, info );
 
@@ -214,13 +206,11 @@ public class DefaultDependencyResolver
 
     private Set<Artifact> resolveTransitively( final Set<Artifact> dependencyArtifacts,
                                                final List<ArtifactRepository> repos,
-                                               final ResolutionManagementInfo info,
+                                               final ArtifactFilter filter,
                                                final AssemblerConfigurationSource configSource )
         throws DependencyResolutionException
     {
         final MavenProject project = configSource.getProject();
-
-        final ArtifactFilter filter = info.getScopeFilter();
 
         ArtifactResolutionRequest req = new ArtifactResolutionRequest();
         req.setLocalRepository( configSource.getLocalRepository() );
@@ -257,14 +247,19 @@ public class DefaultDependencyResolver
     {
         final List<Repository> repositories = assembly.getRepositories();
 
+        Set<String> rootScopes = new HashSet<String>();
+        
         if ( repositories != null && !repositories.isEmpty() )
         {
+            
             requirements.setResolutionRequired( true );
             for ( final Repository repo : repositories )
             {
-                enableScope( repo.getScope(), requirements );
+                rootScopes.add( repo.getScope() );
             }
         }
+        
+        requirements.setScopeFilter( FilterUtils.newScopeFilter( rootScopes ) );
     }
 
 
@@ -308,6 +303,7 @@ public class DefaultDependencyResolver
             if ( binaries.isIncludeDependencies() )
             {
                 updateDependencySetResolutionRequirements( dependencySet, requirements, assemblyId,
+                                                           configSource.getMavenSession().getProjectBuildingRequest(),
                                                            projects.toArray( new MavenProject[projects.size()] ) );
             }
         }
@@ -315,6 +311,7 @@ public class DefaultDependencyResolver
 
     void updateDependencySetResolutionRequirements( final DependencySet set,
                                                     final ResolutionManagementInfo requirements, AssemblyId assemblyId,
+                                                    ProjectBuildingRequest buildingRequest,
                                                     final MavenProject... projects )
         throws DependencyResolutionException
     {
@@ -322,8 +319,10 @@ public class DefaultDependencyResolver
 
         requirements.setResolvedTransitively( set.isUseTransitiveDependencies() );
 
-        enableScope( set.getScope(), requirements );
-
+        ScopeFilter scopeFilter = FilterUtils.newScopeFilter( set.getScope() );
+        
+        requirements.setScopeFilter( scopeFilter );
+        
         for ( final MavenProject project : projects )
         {
             if ( project == null )
@@ -336,10 +335,19 @@ public class DefaultDependencyResolver
             {
                 try
                 {
-                    dependencyArtifacts = project.createArtifacts( factory, null, requirements.getScopeFilter() );
+                    Iterable<ArtifactResult> artifactResults =
+                        dependencyResolver.resolveDependencies( buildingRequest, project.getModel(), scopeFilter );
+                    
+                    dependencyArtifacts = new HashSet<Artifact>();
+                    
+                    for ( ArtifactResult artifactResult : artifactResults )
+                    {
+                        dependencyArtifacts.add( artifactResult.getArtifact() );
+                    }
+                    
                     project.setDependencyArtifacts( dependencyArtifacts );
                 }
-                catch ( final InvalidDependencyVersionException e )
+                catch ( final DependencyResolverException e )
                 {
                     throw new DependencyResolutionException(
                         "Failed to create dependency artifacts for resolution. Assembly: " + assemblyId, e );
@@ -349,30 +357,6 @@ public class DefaultDependencyResolver
             requirements.addArtifacts( dependencyArtifacts );
             getLogger().debug( "Dependencies for project: " + project.getId() + " are:\n" + StringUtils.join(
                 dependencyArtifacts.iterator(), "\n" ) );
-        }
-    }
-
-    private void enableScope( final String scope, final ResolutionManagementInfo requirements )
-    {
-        if ( Artifact.SCOPE_COMPILE.equals( scope ) )
-        {
-            requirements.enableCompileScope();
-        }
-        else if ( Artifact.SCOPE_PROVIDED.equals( scope ) )
-        {
-            requirements.enableProvidedScope();
-        }
-        else if ( Artifact.SCOPE_RUNTIME.equals( scope ) )
-        {
-            requirements.enableRuntimeScope();
-        }
-        else if ( Artifact.SCOPE_SYSTEM.equals( scope ) )
-        {
-            requirements.enableSystemScope();
-        }
-        else if ( Artifact.SCOPE_TEST.equals( scope ) )
-        {
-            requirements.enableTestScope();
         }
     }
 

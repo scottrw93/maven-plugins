@@ -42,9 +42,8 @@ import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.shared.dependency.TransferUtils;
-import org.apache.maven.shared.dependency.resolve.DependencyResolver;
-import org.apache.maven.shared.dependency.resolve.DependencyResolverException;
+import org.apache.maven.shared.dependencies.resolve.DependencyResolver;
+import org.apache.maven.shared.dependencies.resolve.DependencyResolverException;
 import org.apache.maven.shared.artifact.filter.resolve.AbstractFilter;
 import org.apache.maven.shared.artifact.filter.resolve.AndFilter;
 import org.apache.maven.shared.artifact.filter.resolve.Node;
@@ -60,13 +59,14 @@ import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.StringUtils;
 
 /**
- * Remove the project dependencies from the local repository, and optionally re-resolve them.
+ * When run on a project, remove the project dependencies from the local repository, and optionally re-resolve them.
+ * Outside of a project, remove the manually given dependencies.
  * 
  * @author jdcasey
  * @version $Id$
  * @since 2.0
  */
-@Mojo( name = "purge-local-repository", threadSafe = true )
+@Mojo( name = "purge-local-repository", threadSafe = true, requiresProject = false )
 public class PurgeLocalRepositoryMojo
     extends AbstractMojo
 {
@@ -488,10 +488,9 @@ public class PurgeLocalRepositoryMojo
     {
         try
         {
-            
             Iterable<ArtifactResult> results =
                 dependencyResolver.resolveDependencies( session.getProjectBuildingRequest(),
-                                              TransferUtils.toDependencyCoordinate( project ), filter );
+                                                        project.getModel(), filter );
 
             Set<Artifact> resolvedArtifacts = new HashSet<Artifact>();
             

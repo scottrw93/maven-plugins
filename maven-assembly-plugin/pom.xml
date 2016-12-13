@@ -19,19 +19,18 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
     <artifactId>maven-plugins</artifactId>
     <groupId>org.apache.maven.plugins</groupId>
-    <version>28</version>
+    <version>30</version>
     <relativePath>../../pom/maven/maven-plugins/pom.xml</relativePath>
   </parent>
 
   <artifactId>maven-assembly-plugin</artifactId>
-  <version>3.0-SNAPSHOT</version>
+  <version>3.0.1-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>Apache Maven Assembly Plugin</name>
@@ -58,12 +57,9 @@ under the License.
   </distributionManagement>
 
   <properties>
-    <maven.compiler.source>1.6</maven.compiler.source>
-    <maven.compiler.target>1.6</maven.compiler.target>
-
-    <mdoVersion>1.1.3</mdoVersion>
-    <mavenArchiverVersion>3.0.0</mavenArchiverVersion>
-    <mavenFilteringVersion>3.0.0</mavenFilteringVersion>
+    <mdoVersion>2.0.0</mdoVersion>
+    <mavenArchiverVersion>3.1.1</mavenArchiverVersion>
+    <mavenFilteringVersion>3.1.1</mavenFilteringVersion>
     <mavenVersion>3.0</mavenVersion>
     <testOutputToFile>true</testOutputToFile>
     <checkstyle.violation.ignore>RedundantThrows,NewlineAtEndOfFile,ParameterNumber,MethodLength,FileLength,ModifierOrder,JavadocMethod</checkstyle.violation.ignore>
@@ -105,22 +101,22 @@ under the License.
       <artifactId>maven-model</artifactId>
       <version>${mavenVersion}</version>
     </dependency>
-    
+
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
       <artifactId>maven-common-artifact-filters</artifactId>
-      <version>3.0.0</version>
+      <version>3.0.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
       <artifactId>maven-artifact-transfer</artifactId>
-      <version>3.0-SNAPSHOT</version>
+      <version>0.9.0</version>
     </dependency>
-    
+
     <dependency>
       <groupId>com.google.code.findbugs</groupId>
       <artifactId>jsr305</artifactId>
-      <version>2.0.1</version>
+      <version>3.0.0</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -130,12 +126,12 @@ under the License.
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-interpolation</artifactId>
-      <version>1.22</version>
+      <version>1.24</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-archiver</artifactId>
-      <version>3.0.3</version>
+      <version>3.4</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
@@ -150,7 +146,7 @@ under the License.
     <dependency>
     <groupId>commons-io</groupId>
     <artifactId>commons-io</artifactId>
-    <version>2.4</version>
+    <version>2.5</version>
   </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
@@ -160,7 +156,7 @@ under the License.
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-io</artifactId>
-      <version>2.6</version>
+      <version>2.7.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
@@ -170,7 +166,7 @@ under the License.
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-utils</artifactId>
-      <version>3.0.22</version>
+      <version>3.0.24</version>
     </dependency>
     <dependency>
       <groupId>commons-codec</groupId>
@@ -179,14 +175,20 @@ under the License.
     </dependency>
     <dependency>
       <groupId>org.apache.maven.plugin-testing</groupId>
+      <artifactId>maven-plugin-testing-harness</artifactId>
+      <version>2.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.plugin-testing</groupId>
       <artifactId>maven-plugin-testing-tools</artifactId>
-      <version>1.3</version>
+      <version>2.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.plugin-testing</groupId>
       <artifactId>maven-test-tools</artifactId>
-      <version>1.3</version>
+      <version>2.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -222,7 +224,19 @@ under the License.
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.8.1</version>
+      <version>4.12</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest-core</artifactId>
+      <version>1.3</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest-library</artifactId>
+      <version>1.3</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -247,7 +261,7 @@ under the License.
       <plugin>
         <groupId>org.codehaus.plexus</groupId>
         <artifactId>plexus-component-metadata</artifactId>
-        <version>1.6</version>
+        <version>1.7</version>
         <executions>
           <execution>
             <id>descriptors</id>
@@ -265,8 +279,8 @@ under the License.
         <configuration>
           <version>${mdoVersion}</version>
           <models>
-            <model>src/main/mdo/descriptor.mdo</model>
-            <model>src/main/mdo/component.mdo</model>
+            <model>src/main/mdo/assembly.mdo</model>
+            <model>src/main/mdo/assembly-component.mdo</model>
           </models>
         </configuration>
         <executions>
@@ -296,7 +310,6 @@ under the License.
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-resources-plugin</artifactId>
-          <version>2.6</version>
           <configuration>
             <escapeString>\</escapeString>
           </configuration>
@@ -332,6 +345,7 @@ under the License.
               <exclude>src/it/**/*.file</exclude>
               <exclude>src/it/projects/filtering-feature/filters-defined-in-build/src/main/config/**</exclude>
               <exclude>src/it/projects/bugs/massembly-731/**</exclude>
+              <exclude>.java-version</exclude>
             </excludes>
           </configuration>
         </plugin>
@@ -342,20 +356,7 @@ under the License.
   <profiles>
     <profile>
       <id>run-its</id>
-      <repositories>
-        <repository>
-          <id>codehaus.org</id>
-          <url>http://snapshots.repository.codehaus.org</url>
-          <releases>
-            <enabled>false</enabled>
-          </releases>
-        </repository>
-      </repositories>
       <pluginRepositories>
-        <pluginRepository>
-          <id>codehaus.snapshots</id>
-          <url>http://snapshots.repository.codehaus.org</url>
-        </pluginRepository>
         <pluginRepository>
           <id>apache.snapshots</id>
           <url>http://repository.apache.org/snapshots</url>
@@ -426,5 +427,4 @@ under the License.
       </build>
     </profile>
   </profiles>
-
 </project>

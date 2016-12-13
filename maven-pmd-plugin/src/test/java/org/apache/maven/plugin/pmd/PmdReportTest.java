@@ -24,11 +24,12 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.plexus.util.FileUtils;
-import org.codehaus.plexus.util.IOUtil;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
@@ -134,15 +135,17 @@ public class PmdReportTest
                       "src/test/resources/unit/default-configuration/default-configuration-plugin-config.xml" );
         PmdReport mojo = (PmdReport) lookupMojo( "pmd", testPom );
 
-        // Additional test case for MPMD-174 (http://jira.codehaus.org/browse/MPMD-174).
+        // Additional test case for MPMD-174 (https://issues.apache.org/jira/browse/MPMD-174).
         WireMockServer mockServer = new WireMockServer( 3456 );
         mockServer.start();
 
         String sonarRuleset =
-            IOUtils.toString( getClass().getClassLoader().getResourceAsStream( "unit/default-configuration/rulesets/sonar-way-ruleset.xml" ) );
+            IOUtils.toString( getClass().getClassLoader().getResourceAsStream( "unit/default-configuration/rulesets/sonar-way-ruleset.xml" ),
+                    StandardCharsets.UTF_8 );
 
         String sonarMainPageHtml =
-            IOUtils.toString( getClass().getClassLoader().getResourceAsStream( "unit/default-configuration/rulesets/sonar-main-page.html" ) );
+            IOUtils.toString( getClass().getClassLoader().getResourceAsStream( "unit/default-configuration/rulesets/sonar-main-page.html" ),
+                    StandardCharsets.UTF_8 );
 
         final String sonarBaseUrl = "/profiles";
         final String sonarProfileUrl = sonarBaseUrl + "/export?format=pmd&language=java&name=Sonar%2520way";
@@ -222,18 +225,18 @@ public class PmdReportTest
 
         // check if custom ruleset was applied
         String str = readFile( new File( getBasedir(), "target/test/unit/custom-configuration/target/site/pmd.html" ) );
-        assertTrue( str.toLowerCase().contains( "Avoid using if statements without curly braces".toLowerCase() ) );
+        assertTrue( lowerCaseContains( str, "Avoid using if statements without curly braces" ) );
 
         // Must be false as IfElseStmtsMustUseBraces is excluded!
-        assertFalse( str.toLowerCase().contains( "Avoid using if...else statements without curly braces".toLowerCase() ) );
+        assertFalse( lowerCaseContains( str, "Avoid using if...else statements without curly braces" ) );
 
-        assertTrue( "unnecessary constructor should not be triggered because of low priority",
-                    !str.toLowerCase().contains( "Avoid unnecessary constructors - the compiler will generate these for you".toLowerCase() ) );
+        assertFalse( "unnecessary constructor should not be triggered because of low priority",
+                    lowerCaseContains( str, "Avoid unnecessary constructors - the compiler will generate these for you" ) );
 
         // veryLongVariableNameWithViolation is really too long
-        assertTrue( str.toLowerCase().contains( "veryLongVariableNameWithViolation".toLowerCase() ) );
+        assertTrue( lowerCaseContains( str, "veryLongVariableNameWithViolation" ) );
         // notSoLongVariableName should not be reported
-        assertFalse( str.toLowerCase().contains( "notSoLongVariableName".toLowerCase() ) );
+        assertFalse( lowerCaseContains( str, "notSoLongVariableName" ) );
     }
 
     /**
@@ -283,7 +286,7 @@ public class PmdReportTest
         File generatedFile = new File( getBasedir(), "target/test/unit/empty-report/target/site/pmd.html" );
         assertTrue( FileUtils.fileExists( generatedFile.getAbsolutePath() ) );
         String str = readFile( new File( getBasedir(), "target/test/unit/empty-report/target/site/pmd.html" ) );
-        assertTrue( !str.toLowerCase().contains( "Hello.java".toLowerCase() ) );
+        assertFalse( lowerCaseContains( str, "Hello.java" ) );
     }
 
     public void testInvalidFormat()
@@ -333,29 +336,17 @@ public class PmdReportTest
     private String readFile( File file )
         throws IOException
     {
-        String strTmp;
-        StringBuilder str = new StringBuilder( (int) file.length() );
-        FileReader reader = null;
-        BufferedReader in = null;
-        try
+        try ( BufferedReader reader = new BufferedReader( new FileReader( file ) ) )
         {
-            reader = new FileReader( file );
-            in = new BufferedReader( reader );
+            final StringBuilder str = new StringBuilder( (int) file.length() );
 
-            while ( ( strTmp = in.readLine() ) != null )
+            for ( String line = reader.readLine(); line != null; line = reader.readLine() )
             {
                 str.append( ' ' );
-                str.append( strTmp );
+                str.append( line );
             }
-            in.close();
+            return str.toString();
         }
-        finally
-        {
-            IOUtil.close( in );
-            IOUtil.close( reader );
-        }
-
-        return str.toString();
     }
 
     /**
@@ -455,4 +446,20 @@ public class PmdReportTest
         assertFalse( "Exclusion of an exact source directory not working", str.contains( "OverrideBothEqualsAndHashcode" ) );
         assertFalse( "Exclusion of basedirectory with subdirectories not working (MPMD-178)", str.contains( "JumbledIncrementer") );
     }
+
+    public void testViolationExclusion()
+            throws Exception
+        {
+            File testPom =
+                new File( getBasedir(),
+                          "src/test/resources/unit/default-configuration/pmd-report-pmd-exclusions-configuration-plugin-config.xml" );
+            final PmdReport mojo = (PmdReport) lookupMojo( "pmd", testPom );
+            mojo.execute();
+
+            File generatedFile = new File( getBasedir(), "target/test/unit/default-configuration/target/pmd.xml" );
+            assertTrue( FileUtils.fileExists( generatedFile.getAbsolutePath() ) );
+            String str = readFile( generatedFile );
+
+            assertEquals(0, StringUtils.countMatches(str, "<violation"));
+        }
 }

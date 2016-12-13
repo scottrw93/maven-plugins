@@ -3,7 +3,7 @@
  ------
   John Casey
  ------
-  05-May-2006
+  2006-05-05
  ------
 
 ~~ Licensed to the Apache Software Foundation (ASF) under one
@@ -35,7 +35,7 @@ Including Module Binaries
   sorts and executes project builds within a multimodule context. Please
   read {{{../../faq.html#module-binaries}this FAQ entry}} if you decide to use them.
   
-  <<NOTE:>> The new (since 2.2) <<<useAllReactorProjects>>> flag in the <<<moduleSet>>> section
+  <<NOTE:>> The new <<<useAllReactorProjects>>> flag in the <<<moduleSet>>> section
   allows you to consume module binaries from child modules in a multimodule build. This
   is an important to resolve the conflict between Maven's build ordering and the old
   approach to module binaries, where the assembly was build from the parent POM.
@@ -58,9 +58,9 @@ Including Module Binaries
   demonstrating the features described by this example.
 
 +---+
-<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion}"
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/${mdoVersion}"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
   <id>bin</id>
   <formats>
     <format>dir</format>

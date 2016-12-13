@@ -169,7 +169,7 @@ public abstract class AbstractDeployMojo
             return;
         }
 
-        deployTo( new BugFixedRepository( getDeploySite().getId(), appendSlash( getDeploySite().getUrl() ) ) );
+        deployTo( new BugFixedRepository( getDeploySite().getId(), getDeploySite().getUrl() ) );
     }
 
     /**
@@ -411,11 +411,14 @@ public abstract class AbstractDeployMojo
 
         try
         {
-            Debug debug = new Debug();
+            if ( getLog().isDebugEnabled() )
+            {
+                Debug debug = new Debug();
 
-            wagon.addSessionListener( debug );
+                wagon.addSessionListener( debug );
 
-            wagon.addTransferListener( debug );
+                wagon.addTransferListener( debug );
+            }
 
             if ( proxyInfo != null )
             {

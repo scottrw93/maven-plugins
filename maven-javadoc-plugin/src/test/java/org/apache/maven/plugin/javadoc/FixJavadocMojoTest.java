@@ -28,9 +28,10 @@ import java.util.List;
 
 import junitx.util.PrivateAccessor;
 
-import org.apache.commons.lang.SystemUtils;
+import org.apache.maven.plugin.javadoc.AbstractFixJavadocMojo.JavaEntityTags;
 import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugin.testing.AbstractMojoTestCase;
+import org.apache.maven.plugin.testing.stubs.MavenProjectStub;
 import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.IOUtil;
@@ -145,14 +146,6 @@ public class FixJavadocMojoTest
     public void testFixJdk5()
         throws Exception
     {
-        if ( !SystemUtils.isJavaVersionAtLeast( 1.5f ) )
-        {
-            getContainer().getLogger().warn(
-                                             "JDK 5.0 or more is required to run fix for '" + getClass().getName()
-                                                 + "#" + getName() + "()'." );
-            return;
-        }
-
         File testPomBasedir = new File( getBasedir(), "target/test/unit/fix-jdk5-test" );
         executeMojoAndTest( testPomBasedir, new String[] { "ClassWithJavadoc.java", "ClassWithNoJavadoc.java",
             "InterfaceWithJavadoc.java", "InterfaceWithNoJavadoc.java", "SubClassWithJavadoc.java" } );
@@ -164,14 +157,6 @@ public class FixJavadocMojoTest
     public void testFixJdk6()
         throws Exception
     {
-        if ( !SystemUtils.isJavaVersionAtLeast( 1.6f ) )
-        {
-            getContainer().getLogger().warn(
-                                             "JDK 6.0 or more is required to run fix for '" + getClass().getName()
-                                                 + "#" + getName() + "()'." );
-            return;
-        }
-
         File testPomBasedir = new File( getBasedir(), "target/test/unit/fix-jdk6-test" );
         executeMojoAndTest( testPomBasedir, new String[] { "ClassWithJavadoc.java", "InterfaceWithJavadoc.java" } );
     }
@@ -499,14 +484,6 @@ public class FixJavadocMojoTest
     public void testJavadocCommentJdk5()
         throws Throwable
     {
-        if ( !SystemUtils.isJavaVersionAtLeast( 1.5f ) )
-        {
-            getContainer().getLogger().warn(
-                                             "JDK 5.0 or more is required to run fix for '" + getClass().getName()
-                                                 + "#" + getName() + "()'." );
-            return;
-        }
-
         String content = "/**" + EOL +
                 " * Dummy Class." + EOL +
                 " */" + EOL +
@@ -603,6 +580,51 @@ public class FixJavadocMojoTest
         assertEquals("return", fixTags[0]);
         assertEquals(1, fixTags.length);
     }
+    
+    public void testRemoveUnknownExceptions() throws Exception
+    {
+        AbstractFixJavadocMojo mojoInstance = new FixJavadocMojo();
+        setVariableValueToObject( mojoInstance, "fixTagsSplitted", new String[] { "all" } );
+        setVariableValueToObject( mojoInstance, "project", new MavenProjectStub() );
+
+        String source = "package a.b.c;" + EOL
+                        + "public class Clazz {" + EOL
+                        + " /**" + EOL
+                        + " * @throws java.lang.RuntimeException" + EOL
+                        + " * @throws NumberFormatException" + EOL
+                        + " * @throws java.lang.Exception" + EOL // not thrown and no RTE -> remove
+                        + " * @throws com.foo.FatalException" + EOL // not on classpath (?!) -> see removeUnknownThrows
+                        + " */" + EOL
+                        + " public void method() {}" + EOL                        
+                        + "}";
+
+        JavaDocBuilder builder = new JavaDocBuilder();
+        JavaMethod javaMethod = builder.addSource( new StringReader( source ) ).getClasses()[0].getMethods()[0];
+        
+        JavaEntityTags javaEntityTags = mojoInstance.parseJavadocTags( source, javaMethod, "", true );
+        
+        StringBuilder sb = new StringBuilder();
+        mojoInstance.writeThrowsTag( sb, javaMethod, javaEntityTags, new String[] { "java.lang.RuntimeException" } );
+        assertEquals( " * @throws java.lang.RuntimeException", sb.toString() );
+
+        sb = new StringBuilder();
+        mojoInstance.writeThrowsTag( sb, javaMethod, javaEntityTags, new String[] { "NumberFormatException" } );
+        assertEquals( " * @throws java.lang.NumberFormatException", sb.toString() );
+
+        sb = new StringBuilder();
+        mojoInstance.writeThrowsTag( sb, javaMethod, javaEntityTags, new String[] { "java.lang.Exception" } );
+        assertEquals( "", sb.toString() );
+        
+        setVariableValueToObject( mojoInstance, "removeUnknownThrows", true );
+        sb = new StringBuilder();
+        mojoInstance.writeThrowsTag( sb, javaMethod, javaEntityTags, new String[] { "com.foo.FatalException" } );
+        assertEquals( "", sb.toString() );
+
+        setVariableValueToObject( mojoInstance, "removeUnknownThrows", false );
+        sb = new StringBuilder();
+        mojoInstance.writeThrowsTag( sb, javaMethod, javaEntityTags, new String[] { "com.foo.FatalException" } );
+        assertEquals( " * @throws com.foo.FatalException if any.", sb.toString() );
+    }
 
     // ----------------------------------------------------------------------
     // private methods
@@ -673,10 +695,10 @@ public class FixJavadocMojoTest
     private static void assertEquals( File expected, File actual )
         throws IOException
     {
-        assertTrue( expected.exists() );
+        assertTrue( " Expected file DNE: " + expected, expected.exists() );
         String expectedContent = StringUtils.unifyLineSeparators( readFile( expected ) );
 
-        assertTrue( actual.exists() );
+        assertTrue( " Actual file DNE: " + actual, actual.exists() );
         String actualContent = StringUtils.unifyLineSeparators( readFile( actual ) );
 
         assertEquals( "Expected file: " + expected.getAbsolutePath() + ", actual file: "
@@ -721,7 +743,10 @@ public class FixJavadocMojoTest
         try
         {
             fileReader = ReaderFactory.newReader( file, "UTF-8" );
-            return IOUtil.toString( fileReader );
+            final String content = IOUtil.toString( fileReader );
+            fileReader.close();
+            fileReader = null;
+            return content;
         }
         finally
         {

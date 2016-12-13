@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Properties;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Resource;
@@ -56,7 +57,7 @@ import org.codehaus.plexus.util.StringUtils;
  * @author Andreas Hoheneder
  * @author William Ferguson
  */
-@Mojo( name = "resources", defaultPhase = LifecyclePhase.PROCESS_RESOURCES, threadSafe = true )
+@Mojo( name = "resources", defaultPhase = LifecyclePhase.PROCESS_RESOURCES, requiresProject = true, threadSafe = true )
 public class ResourcesMojo
     extends AbstractMojo
     implements Contextualizable
@@ -65,7 +66,7 @@ public class ResourcesMojo
     /**
      * The character encoding scheme to be applied when filtering resources.
      */
-    @Parameter( property = "encoding", defaultValue = "${project.build.sourceEncoding}" )
+    @Parameter( defaultValue = "${project.build.sourceEncoding}" )
     protected String encoding;
 
     /**
@@ -132,11 +133,13 @@ public class ResourcesMojo
     protected MavenSession session;
 
     /**
-     * Expression preceded with the String won't be interpolated \${foo} will be replaced with ${foo}
-     *
+     * Expressions preceded with this string won't be interpolated. Anything else preceded with this string will be
+     * passed through unchanged. For example {@code \${foo}} will be replaced with {@code ${foo}} but {@code \\${foo}}
+     * will be replaced with {@code \\value of foo}, if this parameter has been set to the backslash.
+     * <br/>
      * @since 2.3
      */
-    @Parameter( property = "maven.resources.escapeString" )
+    @Parameter
     protected String escapeString;
 
     /**
@@ -144,7 +147,7 @@ public class ResourcesMojo
      *
      * @since 2.3
      */
-    @Parameter( property = "maven.resources.overwrite", defaultValue = "false" )
+    @Parameter( defaultValue = "false" )
     private boolean overwrite;
 
     /**
@@ -152,7 +155,7 @@ public class ResourcesMojo
      *
      * @since 2.3
      */
-    @Parameter( property = "maven.resources.includeEmptyDirs", defaultValue = "false" )
+    @Parameter( defaultValue = "false" )
     protected boolean includeEmptyDirs;
 
     /**
@@ -168,13 +171,13 @@ public class ResourcesMojo
      *
      * @since 2.4
      */
-    @Parameter( property = "maven.resources.escapeWindowsPaths", defaultValue = "true" )
+    @Parameter( defaultValue = "true" )
     protected boolean escapeWindowsPaths;
 
     /**
      * <p>
      * Set of delimiters for expressions to filter within the resources. These delimiters are specified in the form
-     * 'beginToken*endToken'. If no '*' is given, the delimiter is assumed to be the same for start and end.
+     * {@code beginToken*endToken}. If no {@code *} is given, the delimiter is assumed to be the same for start and end.
      * </p>
      * <p>
      * So, the default filtering delimiters might be specified as:
@@ -187,7 +190,7 @@ public class ResourcesMojo
      * &lt;/delimiters&gt;
      * </pre>
      * <p>
-     * Since the '@' delimiter is the same on both ends, we don't need to specify '@*@' (though we can).
+     * Since the {@code @} delimiter is the same on both ends, we don't need to specify {@code @*@} (though we can).
      * </p>
      *
      * @since 2.4
@@ -202,6 +205,36 @@ public class ResourcesMojo
      */
     @Parameter( defaultValue = "true" )
     protected boolean useDefaultDelimiters;
+
+    /**
+     * By default files like {@code .gitignore}, {@code .cvsignore} etc. are excluded which means they will not being
+     * copied. If you need them for a particular reason you can do that by settings this to {@code false}. This means
+     * all files like the following will be copied.
+     * <ul>
+     * <li>Misc: &#42;&#42;/&#42;~, &#42;&#42;/#&#42;#, &#42;&#42;/.#&#42;, &#42;&#42;/%&#42;%, &#42;&#42;/._&#42;</li>
+     * <li>CVS: &#42;&#42;/CVS, &#42;&#42;/CVS/&#42;&#42;, &#42;&#42;/.cvsignore</li>
+     * <li>RCS: &#42;&#42;/RCS, &#42;&#42;/RCS/&#42;&#42;</li>
+     * <li>SCCS: &#42;&#42;/SCCS, &#42;&#42;/SCCS/&#42;&#42;</li>
+     * <li>VSSercer: &#42;&#42;/vssver.scc</li>
+     * <li>MKS: &#42;&#42;/project.pj</li>
+     * <li>SVN: &#42;&#42;/.svn, &#42;&#42;/.svn/&#42;&#42;</li>
+     * <li>GNU: &#42;&#42;/.arch-ids, &#42;&#42;/.arch-ids/&#42;&#42;</li>
+     * <li>Bazaar: &#42;&#42;/.bzr, &#42;&#42;/.bzr/&#42;&#42;</li>
+     * <li>SurroundSCM: &#42;&#42;/.MySCMServerInfo</li>
+     * <li>Mac: &#42;&#42;/.DS_Store</li>
+     * <li>Serena Dimension: &#42;&#42;/.metadata, &#42;&#42;/.metadata/&#42;&#42;</li>
+     * <li>Mercurial: &#42;&#42;/.hg, &#42;&#42;/.hg/&#42;&#42;</li>
+     * <li>GIT: &#42;&#42;/.git, &#42;&#42;/.gitignore, &#42;&#42;/.gitattributes, &#42;&#42;/.git/&#42;&#42;</li>
+     * <li>Bitkeeper: &#42;&#42;/BitKeeper, &#42;&#42;/BitKeeper/&#42;&#42;, &#42;&#42;/ChangeSet,
+     * &#42;&#42;/ChangeSet/&#42;&#42;</li>
+     * <li>Darcs: &#42;&#42;/_darcs, &#42;&#42;/_darcs/&#42;&#42;, &#42;&#42;/.darcsrepo,
+     * &#42;&#42;/.darcsrepo/&#42;&#42;&#42;&#42;/-darcs-backup&#42;, &#42;&#42;/.darcs-temp-mail
+     * </ul>
+     *
+     * @since 3.0.0
+     */
+    @Parameter( defaultValue = "true" )
+    protected boolean addDefaultExcludes;
 
     /**
      * <p>
@@ -230,7 +263,7 @@ public class ResourcesMojo
      *
      * @since 2.5
      */
-    @Parameter( property = "maven.resources.supportMultiLineFiltering", defaultValue = "false" )
+    @Parameter( defaultValue = "false" )
     private boolean supportMultiLineFiltering;
 
     /**
@@ -250,12 +283,14 @@ public class ResourcesMojo
     @Parameter( property = "maven.resources.skip", defaultValue = "false" )
     private boolean skip;
 
+    /** {@inheritDoc} */
     public void contextualize( Context context )
         throws ContextException
     {
         plexusContainer = (PlexusContainer) context.get( PlexusConstants.PLEXUS_KEY );
     }
 
+    /** {@inheritDoc} */
     public void execute()
         throws MojoExecutionException
     {
@@ -274,10 +309,10 @@ public class ResourcesMojo
         try
         {
 
-            List<String> filters = getCombinedFiltersList();
+            List<String> combinedFilters = getCombinedFiltersList();
 
             MavenResourcesExecution mavenResourcesExecution =
-                new MavenResourcesExecution( getResources(), getOutputDirectory(), project, encoding, filters,
+                new MavenResourcesExecution( getResources(), getOutputDirectory(), project, encoding, combinedFilters,
                                              Collections.<String>emptyList(), session );
 
             mavenResourcesExecution.setEscapeWindowsPaths( escapeWindowsPaths );
@@ -291,6 +326,11 @@ public class ResourcesMojo
             mavenResourcesExecution.setIncludeEmptyDirs( includeEmptyDirs );
             mavenResourcesExecution.setSupportMultiLineFiltering( supportMultiLineFiltering );
             mavenResourcesExecution.setFilterFilenames( fileNameFiltering );
+            mavenResourcesExecution.setAddDefaultExcludes( addDefaultExcludes );
+
+            // Handle subject of MRESOURCES-99
+            Properties additionalProperties = addSeveralSpecialProperties();
+            mavenResourcesExecution.setAdditionalProperties( additionalProperties );
 
             // if these are NOT set, just use the defaults, which are '${*}' and '@'.
             mavenResourcesExecution.setDelimiters( delimiters, useDefaultDelimiters );
@@ -310,6 +350,36 @@ public class ResourcesMojo
     }
 
     /**
+     * This solves https://issues.apache.org/jira/browse/MRESOURCES-99.<br/>
+     * BUT:<br/>
+     * This should be done different than defining those properties a second time, cause they have already being defined
+     * in Maven Model Builder (package org.apache.maven.model.interpolation) via BuildTimestampValueSource. But those
+     * can't be found in the context which can be got from the maven core.<br/>
+     * A solution could be to put those values into the context by Maven core so they are accessible everywhere. (I'm
+     * not sure if this is a good idea). Better ideas are always welcome.
+     * 
+     * The problem at the moment is that maven core handles usage of properties and replacements in 
+     * the model, but does not the resource filtering which needed some of the properties.
+     * 
+     * @return the new instance with those properties.
+     */
+    private Properties addSeveralSpecialProperties()
+    {
+        String timeStamp = new MavenBuildTimestamp().formattedTimestamp();
+        Properties additionalProperties = new Properties();
+        additionalProperties.put( "maven.build.timestamp", timeStamp );
+        if ( project.getBasedir() != null )
+        {
+            additionalProperties.put( "project.baseUri", project.getBasedir().getAbsoluteFile().toURI().toString() );
+        }
+
+        return additionalProperties;
+    }
+
+    /**
+     * @param mavenResourcesExecution {@link MavenResourcesExecution} 
+     * @throws MojoExecutionException in case of wrong lookup.
+     * @throws MavenFilteringException in case of failure.
      * @since 2.5
      */
     protected void executeUserFilterComponents( MavenResourcesExecution mavenResourcesExecution )
@@ -348,6 +418,9 @@ public class ResourcesMojo
         }
     }
 
+    /**
+     * @return The combined filters.
+     */
     protected List<String> getCombinedFiltersList()
     {
         if ( filters == null || filters.isEmpty() )
@@ -372,14 +445,14 @@ public class ResourcesMojo
     /**
      * Determines whether filtering has been enabled for any resource.
      *
-     * @param resources The set of resources to check for filtering, may be <code>null</code>.
+     * @param theResources The set of resources to check for filtering, may be <code>null</code>.
      * @return <code>true</code> if at least one resource uses filtering, <code>false</code> otherwise.
      */
-    private boolean isFilteringEnabled( Collection<Resource> resources )
+    private boolean isFilteringEnabled( Collection<Resource> theResources )
     {
-        if ( resources != null )
+        if ( theResources != null )
         {
-            for ( Resource resource : resources )
+            for ( Resource resource : theResources )
             {
                 if ( resource.isFiltering() )
                 {
@@ -390,76 +463,121 @@ public class ResourcesMojo
         return false;
     }
 
+    /**
+     * @return {@link #resources}
+     */
     public List<Resource> getResources()
     {
         return resources;
     }
 
+    /**
+     * @param resources set {@link #resources}
+     */
     public void setResources( List<Resource> resources )
     {
         this.resources = resources;
     }
 
+    /**
+     * @return {@link #outputDirectory}
+     */
     public File getOutputDirectory()
     {
         return outputDirectory;
     }
 
+    /**
+     * @param outputDirectory the output folder.
+     */
     public void setOutputDirectory( File outputDirectory )
     {
         this.outputDirectory = outputDirectory;
     }
 
+    /**
+     * @return {@link #overwrite}
+     */
     public boolean isOverwrite()
     {
         return overwrite;
     }
 
+    /**
+     * @param overwrite true to overwrite false otherwise.
+     */
     public void setOverwrite( boolean overwrite )
     {
         this.overwrite = overwrite;
     }
 
+    /**
+     * @return {@link #includeEmptyDirs}
+     */
     public boolean isIncludeEmptyDirs()
     {
         return includeEmptyDirs;
     }
 
+    /**
+     * @param includeEmptyDirs true/false.
+     */
     public void setIncludeEmptyDirs( boolean includeEmptyDirs )
     {
         this.includeEmptyDirs = includeEmptyDirs;
     }
 
+    /**
+     * @return {@link #filters}
+     */
     public List<String> getFilters()
     {
         return filters;
     }
 
+    /**
+     * @param filters The filters to use.
+     */
     public void setFilters( List<String> filters )
     {
         this.filters = filters;
     }
 
+    /**
+     * @return {@link #delimiters}
+     */
     public LinkedHashSet<String> getDelimiters()
     {
         return delimiters;
     }
 
+    /**
+     * @param delimiters The delimiters to use.
+     */
     public void setDelimiters( LinkedHashSet<String> delimiters )
     {
         this.delimiters = delimiters;
     }
 
+    /**
+     * @return {@link #useDefaultDelimiters}
+     */
     public boolean isUseDefaultDelimiters()
     {
         return useDefaultDelimiters;
     }
 
+    /**
+     * @param useDefaultDelimiters true to use {@code ${*}}
+     */
     public void setUseDefaultDelimiters( boolean useDefaultDelimiters )
     {
         this.useDefaultDelimiters = useDefaultDelimiters;
     }
 
+    /**
+     * @return {@link #skip}
+     */
     public boolean isSkip()
     {
         return skip;

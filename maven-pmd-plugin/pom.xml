@@ -25,12 +25,12 @@ under the License.
   <parent>
     <artifactId>maven-plugins</artifactId>
     <groupId>org.apache.maven.plugins</groupId>
-    <version>28</version>
+    <version>30</version>
     <relativePath>../../pom/maven/maven-plugins/pom.xml</relativePath>
   </parent>
 
   <artifactId>maven-pmd-plugin</artifactId>
-  <version>3.7-SNAPSHOT</version>
+  <version>3.8-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>Apache Maven PMD Plugin</name>
@@ -82,11 +82,11 @@ under the License.
   <properties>
     <mavenVersion>2.2.1</mavenVersion>
     <doxiaVersion>1.4</doxiaVersion>
-    <!-- Because PMD 5.1+ requires Java 6 -->
-    <javaVersion>1.6</javaVersion>
+    <!-- Because PMD 5.4+ requires Java 7 -->
+    <javaVersion>1.7</javaVersion>
     <maven.compiler.source>${javaVersion}</maven.compiler.source>
     <maven.compiler.target>${javaVersion}</maven.compiler.target>
-    <pmdVersion>5.3.5</pmdVersion>
+    <pmdVersion>5.5.1</pmdVersion>
     <sitePluginVersion>3.4</sitePluginVersion>
     <projectInfoReportsPluginVersion>2.8</projectInfoReportsPluginVersion>
   </properties>
@@ -135,26 +135,13 @@ under the License.
       <artifactId>doxia-site-renderer</artifactId>
       <version>${doxiaVersion}</version>
       <!--
-        pmd 4.3 requires version 1.6.1 of dom4j
-        doxia-site-renderer 1.3 brings in dom4j 1.1 if we don't exclude it here
+        doxia-site-renderer requires transitively dom4j 1.1 which provides a very old version of jaxen (same jar).
+        PMD requires a newer version of jaxen, which is not compatible.
       -->
       <exclusions>
         <exclusion>
-          <groupId>dom4j</groupId>
           <artifactId>dom4j</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <!-- adding back dependency to dom4j for doxia-site-renderer -->
-    <dependency>
-      <groupId>dom4j</groupId>
-      <artifactId>dom4j</artifactId>
-      <version>1.6.1</version>
-      <scope>runtime</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>xml-apis</artifactId>
-          <groupId>xml-apis</groupId>
+          <groupId>dom4j</groupId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -180,7 +167,7 @@ under the License.
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-utils</artifactId>
-      <version>3.0.21</version>
+      <version>3.0.24</version>
     </dependency>
 
     <!-- pmd -->
@@ -234,22 +221,12 @@ under the License.
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
-      <version>2.4</version>
+      <version>2.5</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
 
   <build>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-release-plugin</artifactId>
-          <!-- Temporary workaround for MRELEASE-925, to get the release out -->
-          <version>2.5.3</version>
-        </plugin>
-      </plugins>
-    </pluginManagement>
     <plugins>
       <!-- Override the Java version inherited from maven-parent -->
       <plugin>
@@ -300,13 +277,13 @@ under the License.
         <configuration>
           <signature>
             <groupId>org.codehaus.mojo.signature</groupId>
-            <artifactId>java16</artifactId>
-            <version>1.1</version>
+            <artifactId>java17</artifactId>
+            <version>1.0</version>
           </signature>
         </configuration>
         <executions>
           <execution>
-            <id>check-java-1.6-compat</id>
+            <id>check-java-1.7-compat</id>
             <phase>process-classes</phase>
             <goals>
               <goal>check</goal>

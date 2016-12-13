@@ -25,9 +25,9 @@ import org.apache.maven.plugins.dependency.AbstractDependencyMojo;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.apache.maven.shared.dependency.collect.CollectorResult;
-import org.apache.maven.shared.dependency.collect.DependencyCollector;
-import org.apache.maven.shared.dependency.collect.DependencyCollectorException;
+import org.apache.maven.shared.dependencies.collect.CollectorResult;
+import org.apache.maven.shared.dependencies.collect.DependencyCollector;
+import org.apache.maven.shared.dependencies.collect.DependencyCollectorException;
 
 /**
  * Goal that resolves all project dependencies and then lists the repositories
@@ -60,7 +60,7 @@ public class ListRepositoriesMojo
         {
             CollectorResult collectResult =
                 dependencyCollector.collectDependencies( session.getProjectBuildingRequest(),
-                                                         getProject().getArtifact() );
+                                                         getProject().getModel() );
 
             this.getLog().info( "Repositories Used by this build:" );
             

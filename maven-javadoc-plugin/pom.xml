@@ -25,12 +25,12 @@ under the License.
   <parent>
     <groupId>org.apache.maven.plugins</groupId>
     <artifactId>maven-plugins</artifactId>
-    <version>28</version>
+    <version>30</version>
     <relativePath>../../pom/maven/maven-plugins/pom.xml</relativePath>
   </parent>
 
   <artifactId>maven-javadoc-plugin</artifactId>
-  <version>2.10.4-SNAPSHOT</version>
+  <version>3.0.0-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>Apache Maven Javadoc Plugin</name>
@@ -61,7 +61,7 @@ under the License.
   </distributionManagement>
 
   <properties>
-    <mavenVersion>2.2.1</mavenVersion>
+    <mavenVersion>3.0</mavenVersion>
     <doxiaVersion>1.4</doxiaVersion>
     <doxia-sitetoolsVersion>1.4</doxia-sitetoolsVersion>
     <wagonVersion>1.0-beta-6</wagonVersion>
@@ -89,18 +89,27 @@ under the License.
     <contributor>
       <name>Richard Eckart de Castilho</name>
     </contributor>
+    <contributor>
+      <name>Kaz Nishimura</name>
+    </contributor>
+    <contributor>
+      <name>Omair Majid</name>
+    </contributor>
+    <contributor>
+      <name>Richard Sand</name>
+    </contributor>
   </contributors>
 
   <dependencies>
+    <dependency> <!-- @TODO remove!! -->
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-compat</artifactId>
+      <version>${mavenVersion}</version>
+    </dependency>
     <!-- maven -->
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-core</artifactId>
-      <version>${mavenVersion}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.maven</groupId>
-      <artifactId>maven-project</artifactId>
       <version>${mavenVersion}</version>
     </dependency>
     <dependency>
@@ -124,18 +133,13 @@ under the License.
       <version>${mavenVersion}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.maven</groupId>
-      <artifactId>maven-artifact-manager</artifactId>
-      <version>${mavenVersion}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.maven</groupId>
-      <artifactId>maven-toolchain</artifactId>
-      <version>${mavenVersion}</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.maven.plugin-tools</groupId>
       <artifactId>maven-plugin-annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.plexus</groupId>
+      <artifactId>plexus-component-annotations</artifactId>
       <scope>provided</scope>
     </dependency>
 
@@ -148,7 +152,7 @@ under the License.
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-archiver</artifactId>
-      <version>2.5</version>
+      <version>3.1.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
@@ -158,7 +162,12 @@ under the License.
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
       <artifactId>maven-common-artifact-filters</artifactId>
-      <version>1.3</version>
+      <version>3.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.shared</groupId>
+      <artifactId>maven-artifact-transfer</artifactId>
+      <version>3.0.0-SNAPSHOT</version>
     </dependency>
 
     <!-- Doxia -->
@@ -186,30 +195,19 @@ under the License.
     <dependency>
       <groupId>commons-lang</groupId>
       <artifactId>commons-lang</artifactId>
-      <version>2.4</version>
+      <version>2.6</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
-      <version>2.2</version>
+      <version>2.5</version>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
-      <version>4.2.3</version>
+      <version>4.5.2</version>
     </dependency>
-    <dependency>
-      <!-- MJAVADOC-246 -->
-      <groupId>commons-logging</groupId>
-      <artifactId>commons-logging</artifactId>
-      <version>1.1.1</version>
-    </dependency>
-    <!-- Not included in Httpclient -->
-    <dependency>
-      <groupId>log4j</groupId>
-      <artifactId>log4j</artifactId>
-      <version>1.2.14</version>
-    </dependency>
+
     <dependency>
       <groupId>com.thoughtworks.qdox</groupId>
       <artifactId>qdox</artifactId>
@@ -219,18 +217,24 @@ under the License.
     <!-- Plexus -->
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
-      <artifactId>plexus-container-default</artifactId>
-      <version>1.0-alpha-9</version>
-    </dependency>
-    <dependency>
-      <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-archiver</artifactId>
-      <version>2.9</version>
+      <version>3.4</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-utils</artifactId>
-      <version>3.0.20</version>
+      <version>3.0.24</version>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.plexus</groupId>
+      <artifactId>plexus-interactivity-api</artifactId>
+      <version>1.0-alpha-4</version>
+      <exclusions>
+        <exclusion>
+          <groupId>plexus</groupId>
+          <artifactId>plexus-utils</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <!-- test -->
@@ -249,7 +253,7 @@ under the License.
     <dependency>
       <groupId>org.apache.maven.plugin-testing</groupId>
       <artifactId>maven-plugin-testing-harness</artifactId>
-      <version>1.2</version>
+      <version>2.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -270,16 +274,23 @@ under the License.
       <version>1.8.5</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.sonatype.aether</groupId>
+      <artifactId>aether-connector-wagon</artifactId>
+      <version>1.7</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.wagon</groupId>
+      <artifactId>wagon-http</artifactId>
+      <version>1.0-beta-6</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
     <pluginManagement>
       <plugins>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-shade-plugin</artifactId>
-          <version>1.7.1</version>
-        </plugin>
         <plugin>
           <groupId>org.apache.rat</groupId>
           <artifactId>apache-rat-plugin</artifactId>
@@ -323,6 +334,20 @@ under the License.
         </configuration>
       </plugin>
       <plugin>
+        <groupId>org.codehaus.plexus</groupId>
+        <artifactId>plexus-component-metadata</artifactId>
+        <version>1.7.1</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>generate-metadata</goal>
+              <goal>generate-test-metadata</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
@@ -333,40 +358,6 @@ under the License.
             </property>
           </systemProperties>
         </configuration>
-      </plugin>
-
-      <!-- Backward compatibility with Maven 2.0.x -->
-      <plugin>
-        <artifactId>maven-shade-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-              <finalName>${project.build.finalName}</finalName>
-              <createDependencyReducedPom>false</createDependencyReducedPom>
-              <keepDependenciesWithProvidedScope>true</keepDependenciesWithProvidedScope>
-              <transformers>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ComponentsXmlResourceTransformer" />
-              </transformers>
-              <artifactSet>
-                <includes>
-                  <include>org.apache.maven.wagon:wagon-provider-api</include>
-                </includes>
-              </artifactSet>
-              <filters>
-                <filter>
-                  <artifact>org.apache.maven.wagon:wagon-provider-api</artifact>
-                  <includes>
-                    <include>org/apache/maven/wagon/proxy/ProxyUtils.class</include>
-                  </includes>
-                </filter>
-              </filters>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
@@ -380,33 +371,10 @@ under the License.
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-invoker-plugin</artifactId>
             <configuration>
-              <pomIncludes>
-                <pomInclude>additional-dependencies*/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-110/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-126/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-137/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-172/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-180/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-194/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-206/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-226/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-97/pom.xml</pomInclude>
-                <!-- pomInclude>**/MJAVADOC-181/pom.xml</pomInclude--><!-- seems to be wrong, see comment in Jira issue  -->
-                <pomInclude>MJAVADOC-250/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-257/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-259/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-262/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-275/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-280-*/pom.xml</pomInclude>
-                <pomInclude>site-failOnError/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-320/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-325/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-365/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-369/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-407/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-414/pom.xml</pomInclude>
-                <pomInclude>MJAVADOC-437/pom.xml</pomInclude>
-              </pomIncludes>
+              <pomExcludes>
+                <pomExclude>MJAVADOC-181/pom.xml</pomExclude> <!-- seems to be wrong, see comment in Jira issue  -->
+                <pomExclude>output-encoding/pom.xml</pomExclude>
+              </pomExcludes>
             </configuration>
           </plugin>
         </plugins>
@@ -468,6 +436,27 @@ under the License.
                 <exlude>**/*Test*.java</exlude>
               </excludes>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>java9</id>
+      <activation>
+        <jdk>[9,)</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-component-metadata</artifactId>
+            <dependencies>
+              <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-all</artifactId>
+                <version>6.0_ALPHA</version>
+              </dependency>
+            </dependencies>
           </plugin>
         </plugins>
       </build>

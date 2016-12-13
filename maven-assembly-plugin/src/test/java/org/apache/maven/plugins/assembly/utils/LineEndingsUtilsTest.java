@@ -274,6 +274,9 @@ public class LineEndingsUtilsTest
             sourceWriter = new FileWriter( source );
 
             IOUtil.copy( sourceReader, sourceWriter );
+
+            sourceWriter.close();
+            sourceWriter = null;
         }
         finally
         {
@@ -290,13 +293,19 @@ public class LineEndingsUtilsTest
             destReader = new FileReader( dest );
 
             IOUtil.copy( destReader, destWriter );
+
+            assertEquals( check, destWriter.toString() );
+
+            destWriter.close();
+            destWriter = null;
+            destReader.close();
+            destReader = null;
         }
         finally
         {
+            IOUtil.close( destWriter );
             IOUtil.close( destReader );
         }
-
-        assertEquals( check, destWriter.toString() );
     }
 
 }

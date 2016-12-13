@@ -28,7 +28,10 @@ import org.codehaus.plexus.compiler.util.scan.SimpleSourceInclusionScanner;
 import org.codehaus.plexus.compiler.util.scan.SourceInclusionScanner;
 import org.codehaus.plexus.compiler.util.scan.StaleSourceScanner;
 
+
 import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -59,12 +62,6 @@ public class TestCompilerMojo
      */
     @Parameter ( defaultValue = "${project.testCompileSourceRoots}", readonly = true, required = true )
     private List<String> compileSourceRoots;
-
-    /**
-     * Project test classpath.
-     */
-    @Parameter ( defaultValue = "${project.testClasspathElements}", required = true, readonly = true )
-    private List<String> classpathElements;
 
     /**
      * The directory where compiled test classes go.
@@ -100,6 +97,13 @@ public class TestCompilerMojo
     @Parameter ( property = "maven.compiler.testTarget" )
     private String testTarget;
 
+    /**
+     * the -release argument for the test Java compiler
+     * 
+     * @since 3.6
+     */
+    @Parameter ( property = "maven.compiler.testRelease" )
+    private String testRelease;
 
     /**
      * <p>
@@ -140,6 +144,15 @@ public class TestCompilerMojo
     @Parameter ( defaultValue = "${project.build.directory}/generated-test-sources/test-annotations" )
     private File generatedTestSourcesDirectory;
 
+    @Parameter( defaultValue = "${project.compileClasspathElements}", readonly = true )
+    private List<String> compilePath;
+
+    @Parameter( defaultValue = "${project.testClasspathElements}", readonly = true )
+    private List<String> testPath;
+
+    private List<String> classpathElements;
+
+    private List<String> modulepathElements;
 
     public void execute()
         throws MojoExecutionException, CompilationFailureException
@@ -147,11 +160,9 @@ public class TestCompilerMojo
         if ( skip )
         {
             getLog().info( "Not compiling test sources" );
+            return;
         }
-        else
-        {
-            super.execute();
-        }
+        super.execute();
     }
 
     protected List<String> getCompileSourceRoots()
@@ -163,10 +174,105 @@ public class TestCompilerMojo
     {
         return classpathElements;
     }
+    
+    @Override
+    protected List<String> getModulepathElements()
+    {
+        return modulepathElements;
+    }
 
     protected File getOutputDirectory()
     {
         return outputDirectory;
+    }
+
+    @Override
+    protected void preparePaths( Set<File> sourceFiles )
+    {
+        File mainOutputDirectory = new File( getProject().getBuild().getOutputDirectory() );
+
+        File mainModuleInfo = new File( mainOutputDirectory, "module-info.class" );
+        
+        boolean hasMainModuleDescriptor = mainModuleInfo.exists();
+        
+        boolean hasTestModuleDescriptor = false;
+        for ( File sourceFile : sourceFiles )
+        {
+            // @todo verify if it is the root of a sourcedirectory?
+            if ( "module-info.java".equals( sourceFile.getName() ) ) 
+            {
+                hasTestModuleDescriptor = true;
+                break;
+            }
+        }
+        
+        List<String> testScopedElements = new ArrayList<String>( testPath );
+        testScopedElements.removeAll( compilePath );
+        
+        if ( release != null )
+        {
+            if ( Integer.valueOf( release ) < 9 )
+            {
+                modulepathElements = Collections.emptyList();
+                classpathElements = testPath;
+                return;
+            }
+        }
+        else if ( Double.valueOf( getTarget() ) < Double.valueOf( MODULE_INFO_TARGET ) )
+        {
+            modulepathElements = Collections.emptyList();
+            classpathElements = testPath;
+            return;
+        }
+            
+        if ( hasTestModuleDescriptor )
+        {
+            modulepathElements = testPath;
+            classpathElements = Collections.emptyList();
+
+            if ( hasMainModuleDescriptor )
+            {
+                // maybe some extra analysis required
+            }
+            else
+            {
+                // very odd
+                // Means that main sources must be compiled with -modulesource and -Xmodule:<moduleName>
+                // However, this has a huge impact since you can't simply use it as a classpathEntry 
+                // due to extra folder in between
+                throw new UnsupportedOperationException( "Can't compile test sources "
+                    + "when main sources are missing a module descriptor" );
+            }
+        }
+        else
+        {
+            if ( hasMainModuleDescriptor )
+            {
+                modulepathElements = compilePath;
+                classpathElements = testScopedElements;
+                if ( compilerArgs == null )
+                {
+                    compilerArgs = new ArrayList<String>();
+                }
+                
+                try
+                {
+                    String moduleName = new AsmModuleInfoParser().getModuleName( mainOutputDirectory  );
+                    compilerArgs.add( "-Xmodule:" + moduleName );
+                    compilerArgs.add( "--add-reads" );
+                    compilerArgs.add( moduleName + "=ALL-UNNAMED" );
+                }
+                catch ( IOException e )
+                {
+                    throw new RuntimeException( "Failed to parse module-info: " + e.getMessage() );
+                }
+            }
+            else
+            {
+                modulepathElements = Collections.emptyList();
+                classpathElements = testPath;
+            }
+        }
     }
 
     protected SourceInclusionScanner getSourceInclusionScanner( int staleMillis )
@@ -221,6 +327,12 @@ public class TestCompilerMojo
     protected String getTarget()
     {
         return testTarget == null ? target : testTarget;
+    }
+    
+    @Override
+    protected String getRelease()
+    {
+        return testRelease == null ? release : testRelease;
     }
 
     protected String getCompilerArgument()

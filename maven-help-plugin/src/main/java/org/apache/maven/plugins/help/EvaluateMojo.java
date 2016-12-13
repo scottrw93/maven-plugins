@@ -19,43 +19,6 @@ package org.apache.maven.plugins.help;
  * under the License.
  */
 
-import com.thoughtworks.xstream.XStream;
-import com.thoughtworks.xstream.converters.MarshallingContext;
-import com.thoughtworks.xstream.converters.collections.PropertiesConverter;
-import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
-
-import org.apache.commons.lang3.ClassUtils;
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.ArtifactUtils;
-import org.apache.maven.artifact.factory.ArtifactFactory;
-import org.apache.maven.artifact.repository.ArtifactRepository;
-import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
-import org.apache.maven.artifact.resolver.ArtifactResolutionException;
-import org.apache.maven.artifact.resolver.ArtifactResolver;
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Model;
-import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
-import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugin.MojoExecution;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugin.PluginParameterExpressionEvaluator;
-import org.apache.maven.plugin.descriptor.MojoDescriptor;
-import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.project.MavenProject;
-import org.apache.maven.project.MavenProjectBuilder;
-import org.apache.maven.project.ProjectBuildingException;
-import org.apache.maven.project.path.PathTranslator;
-import org.apache.maven.settings.Settings;
-import org.apache.maven.settings.io.xpp3.SettingsXpp3Writer;
-import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluationException;
-import org.codehaus.plexus.components.interactivity.InputHandler;
-import org.codehaus.plexus.util.IOUtil;
-import org.codehaus.plexus.util.StringUtils;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -69,6 +32,37 @@ import java.util.TreeMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 
+import org.apache.commons.lang3.ClassUtils;
+import org.apache.maven.lifecycle.internal.MojoDescriptorCreator;
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
+import org.apache.maven.plugin.MojoExecution;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugin.PluginParameterExpressionEvaluator;
+import org.apache.maven.plugin.descriptor.MojoDescriptor;
+import org.apache.maven.plugins.annotations.Component;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.DefaultProjectBuildingRequest;
+import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuildingException;
+import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.settings.Settings;
+import org.apache.maven.settings.io.xpp3.SettingsXpp3Writer;
+import org.apache.maven.shared.artifact.ArtifactCoordinate;
+import org.apache.maven.shared.artifact.resolve.ArtifactResolverException;
+import org.codehaus.plexus.component.configurator.expression.ExpressionEvaluationException;
+import org.codehaus.plexus.components.interactivity.InputHandler;
+import org.codehaus.plexus.util.IOUtil;
+import org.codehaus.plexus.util.StringUtils;
+
+import com.thoughtworks.xstream.XStream;
+import com.thoughtworks.xstream.converters.MarshallingContext;
+import com.thoughtworks.xstream.converters.collections.PropertiesConverter;
+import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
+
 /**
  * Evaluates Maven expressions given by the user in an interactive mode.
  *
@@ -78,17 +72,11 @@ import java.util.jar.JarInputStream;
  */
 @Mojo( name = "evaluate", requiresProject = false )
 public class EvaluateMojo
-    extends AbstractMojo
+    extends AbstractHelpMojo
 {
     // ----------------------------------------------------------------------
     // Mojo components
     // ----------------------------------------------------------------------
-
-    /**
-     * Maven Artifact Factory component.
-     */
-    @Component
-    private ArtifactFactory artifactFactory;
 
     /**
      * Input handler, needed for command line handling.
@@ -97,35 +85,32 @@ public class EvaluateMojo
     private InputHandler inputHandler;
 
     /**
-     * Maven Project Builder component.
+     * Component used to get mojo descriptors.
      */
     @Component
-    private MavenProjectBuilder mavenProjectBuilder;
-
-    /**
-     */
-    @Component
-    private PathTranslator pathTranslator;
-
-    /**
-     * Artifact Resolver component.
-     */
-    @Component
-    private ArtifactResolver resolver;
-
-    /**
-     */
-    @Component
-    private LoggerRetriever loggerRetriever;
+    private MojoDescriptorCreator mojoDescriptorCreator;
 
     // ----------------------------------------------------------------------
     // Mojo parameters
     // ----------------------------------------------------------------------
+    
+    // we need to hide the 'output' defined in AbstractHelpMojo to have a correct "since".
+    /**
+     * Optional parameter to write the output of this help in a given file, instead of writing to the console.
+     * This parameter will be ignored if no <code>expression</code> is specified.
+     * <br/>
+     * <b>Note</b>: Could be a relative path.
+     * 
+     * @since 3.0.0
+     */
+    @Parameter( property = "output" )
+    private File output;
 
     /**
      * An artifact for evaluating Maven expressions.
      * <br/>
-     * <b>Note</b>: Should respect the Maven format, i.e. <code>groupId:artifactId[:version][:classifier]</code>.
+     * <b>Note</b>: Should respect the Maven format, i.e. <code>groupId:artifactId[:version]</code>. The
+     * latest version of the artifact will be used when no version is specified.
      */
     @Parameter( property = "artifact" )
     private String artifact;
@@ -137,34 +122,16 @@ public class EvaluateMojo
     private String expression;
 
     /**
-     * Local Repository.
-     */
-    @Parameter( defaultValue = "${localRepository}", required = true, readonly = true )
-    protected ArtifactRepository localRepository;
-
-    /**
-     * The current Maven project or the super pom.
+     * Maven project built from the given {@link #artifact}. Otherwise, the current Maven project or the super pom.
      */
     @Parameter( defaultValue = "${project}", readonly = true, required = true )
-    protected MavenProject project;
-
-    /**
-     * Remote repositories used for the project.
-     */
-    @Parameter( defaultValue = "${project.remoteArtifactRepositories}", required = true, readonly = true )
-    private List<ArtifactRepository> remoteRepositories;
+    private MavenProject project;
 
     /**
      * The system settings for Maven.
      */
     @Parameter( defaultValue = "${settings}", readonly = true, required = true )
-    protected Settings settings;
-
-    /**
-     * The current Maven session.
-     */
-    @Parameter( defaultValue = "${session}", readonly = true, required = true )
-    private MavenSession session;
+    private Settings settings;
 
     // ----------------------------------------------------------------------
     // Instance variables
@@ -196,21 +163,16 @@ public class EvaluateMojo
 
         if ( StringUtils.isNotEmpty( artifact ) )
         {
-            Artifact artifactObj = getArtifact( artifact );
-
-            try
-            {
-                project = getMavenProject( artifactObj );
-            }
-            catch ( ProjectBuildingException e )
-            {
-                throw new MojoExecutionException( "Unable to get the POM for the artifact '" + artifact
-                    + "'. Verify the artifact parameter." );
-            }
+            project = getMavenProject( artifact );
         }
 
         if ( expression == null )
         {
+            if ( output != null )
+            {
+                getLog().warn( "When prompting for input, the result will be written to the console, "
+                    + "ignoring 'output'." );
+            }
             while ( true )
             {
                 getLog().info( "Enter the Maven expression i.e. ${project.groupId} or 0 to exit?:" );
@@ -223,7 +185,7 @@ public class EvaluateMojo
                         break;
                     }
 
-                    handleResponse( userExpression );
+                    handleResponse( userExpression, null );
                 }
                 catch ( IOException e )
                 {
@@ -233,7 +195,7 @@ public class EvaluateMojo
         }
         else
         {
-            handleResponse( "${" + expression + "}" );
+            handleResponse( "${" + expression + "}", output );
         }
     }
 
@@ -254,99 +216,35 @@ public class EvaluateMojo
     }
 
     /**
-     * @param artifactString should respect the format <code>groupId:artifactId[:version][:classifier]</code>
-     * @return the <code>Artifact</code> object for the <code>artifactString</code> parameter.
-     * @throws MojoExecutionException if the <code>artifactString</code> doesn't respect the format.
-     */
-    private Artifact getArtifact( String artifactString )
-        throws MojoExecutionException
-    {
-        if ( StringUtils.isEmpty( artifactString ) )
-        {
-            throw new IllegalArgumentException( "artifact parameter could not be empty" );
-        }
-
-        String groupId; // required
-        String artifactId; // required
-        String version; // optional
-        String classifier = null; // optional
-
-        String[] artifactParts = artifactString.split( ":" );
-
-        switch ( artifactParts.length )
-        {
-            case 2:
-                groupId = artifactParts[0];
-                artifactId = artifactParts[1];
-                version = Artifact.LATEST_VERSION;
-                break;
-            case 3:
-                groupId = artifactParts[0];
-                artifactId = artifactParts[1];
-                version = artifactParts[2];
-                break;
-            case 4:
-                groupId = artifactParts[0];
-                artifactId = artifactParts[1];
-                version = artifactParts[2];
-                classifier = artifactParts[3];
-                break;
-            default:
-                throw new MojoExecutionException( "The artifact parameter '" + artifactString
-                    + "' should be conform to: " + "'groupId:artifactId[:version][:classifier]'." );
-        }
-
-        if ( StringUtils.isNotEmpty( classifier ) )
-        {
-            return artifactFactory.createArtifactWithClassifier( groupId, artifactId, version, "jar", classifier );
-        }
-
-        return artifactFactory.createArtifact( groupId, artifactId, version, Artifact.SCOPE_COMPILE, "jar" );
-    }
-
-    /**
-     * @param artifactObj not null
-     * @return the POM for the given artifact.
-     * @throws MojoExecutionException if the artifact has a system scope.
-     * @throws ProjectBuildingException when building pom.
-     */
-    private MavenProject getMavenProject( Artifact artifactObj )
-        throws MojoExecutionException, ProjectBuildingException
-    {
-        if ( Artifact.SCOPE_SYSTEM.equals( artifactObj.getScope() ) )
-        {
-            throw new MojoExecutionException( "System artifact is not be handled." );
-        }
-
-        Artifact copyArtifact = ArtifactUtils.copyArtifact( artifactObj );
-        if ( !"pom".equals( copyArtifact.getType() ) )
-        {
-            copyArtifact =
-                artifactFactory.createProjectArtifact( copyArtifact.getGroupId(), copyArtifact.getArtifactId(),
-                                                       copyArtifact.getVersion(), copyArtifact.getScope() );
-        }
-
-        return mavenProjectBuilder.buildFromRepository( copyArtifact, remoteRepositories, localRepository );
-    }
-
-    /**
      * @return a lazy loading evaluator object.
      * @throws MojoExecutionException if any
      * @throws MojoFailureException if any reflection exceptions occur or missing components.
-     * @see #getMojoDescriptor(String, MavenSession, MavenProject, String, boolean, boolean)
      */
     private PluginParameterExpressionEvaluator getEvaluator()
         throws MojoExecutionException, MojoFailureException
     {
         if ( evaluator == null )
         {
-            MojoDescriptor mojoDescriptor =
-                HelpUtil.getMojoDescriptor( "help:evaluate", session, project, "help:evaluate", true, false );
+            MojoDescriptor mojoDescriptor;
+            try
+            {
+                mojoDescriptor = mojoDescriptorCreator.getMojoDescriptor( "help:evaluate", session, project );
+            }
+            catch ( Exception e )
+            {
+                throw new MojoFailureException( "Failure while evaluating.", e );
+            }
             MojoExecution mojoExecution = new MojoExecution( mojoDescriptor );
-            evaluator =
-                new PluginParameterExpressionEvaluator( session, mojoExecution, pathTranslator,
-                                                        loggerRetriever.getLogger(), project,
-                                                        session.getExecutionProperties() );
+
+            MavenProject currentProject = session.getCurrentProject();
+            // Maven 3: PluginParameterExpressionEvaluator gets the current project from the session:
+            // synchronize in case another thread wants to fetch the real current project in between
+            synchronized ( session )
+            {
+                session.setCurrentProject( project );
+                evaluator = new PluginParameterExpressionEvaluator( session, mojoExecution );
+                session.setCurrentProject( currentProject );
+            }
         }
 
         return evaluator;
@@ -354,10 +252,11 @@ public class EvaluateMojo
 
     /**
      * @param expr the user expression asked.
+     * @param output the file where to write the result, or <code>null</code> to print in standard output.
      * @throws MojoExecutionException if any
      * @throws MojoFailureException if any reflection exceptions occur or missing components.
      */
-    private void handleResponse( String expr )
+    private void handleResponse( String expr, File output )
         throws MojoExecutionException, MojoFailureException
     {
         StringBuilder response = new StringBuilder();
@@ -466,7 +365,22 @@ public class EvaluateMojo
             response.append( toXML( expr, obj ) );
         }
 
-        getLog().info( "\n" + response.toString() );
+        if ( output != null )
+        {
+            try
+            {
+                writeFile( output, response );
+            }
+            catch ( IOException e )
+            {
+                throw new MojoExecutionException( "Cannot write evaluation of expression to output: " + output, e );
+            }
+            getLog().info( "Result of evaluation written to: " + output );
+        }
+        else
+        {
+            getLog().info( LS + response.toString() );
+        }
     }
 
     /**
@@ -557,18 +471,11 @@ public class EvaluateMojo
                 getLog().debug( "MojoExecutionException: " + e.getMessage(), e );
             }
         }
-        catch ( ArtifactResolutionException e )
+        catch ( ArtifactResolverException e )
         {
             if ( getLog().isDebugEnabled() )
             {
-                getLog().debug( "ArtifactResolutionException: " + e.getMessage(), e );
-            }
-        }
-        catch ( ArtifactNotFoundException e )
-        {
-            if ( getLog().isDebugEnabled() )
-            {
-                getLog().debug( "ArtifactNotFoundException: " + e.getMessage(), e );
+                getLog().debug( "ArtifactResolverException: " + e.getMessage(), e );
             }
         }
         catch ( ProjectBuildingException e )
@@ -593,8 +500,8 @@ public class EvaluateMojo
         try
         {
             jarStream = new JarInputStream( new FileInputStream( jarFile ) );
-            JarEntry jarEntry = jarStream.getNextJarEntry();
-            while ( jarEntry != null )
+            for ( JarEntry jarEntry = jarStream.getNextJarEntry(); jarEntry != null;
+                  jarEntry = jarStream.getNextJarEntry() )
             {
                 if ( jarEntry.getName().toLowerCase( Locale.ENGLISH ).endsWith( ".class" ) )
                 {
@@ -621,8 +528,10 @@ public class EvaluateMojo
                 }
 
                 jarStream.closeEntry();
-                jarEntry = jarStream.getNextJarEntry();
             }
+
+            jarStream.close();
+            jarStream = null;
         }
         catch ( IOException e )
         {
@@ -641,12 +550,10 @@ public class EvaluateMojo
      * @return the <code>org.apache.maven:maven-model</code> artifact jar file in the local repository.
      * @throws MojoExecutionException if any
      * @throws ProjectBuildingException if any
-     * @throws ArtifactResolutionException if any
-     * @throws ArtifactNotFoundException if any
+     * @throws ArtifactResolverException if any
      */
     private File getMavenModelJarFile()
-        throws MojoExecutionException, ProjectBuildingException, ArtifactResolutionException,
-        ArtifactNotFoundException
+        throws MojoExecutionException, ProjectBuildingException, ArtifactResolverException
     {
         return getArtifactFile( true );
     }
@@ -655,32 +562,26 @@ public class EvaluateMojo
      * @return the <code>org.apache.maven:maven-settings</code> artifact jar file in the local repository.
      * @throws MojoExecutionException if any
      * @throws ProjectBuildingException if any
-     * @throws ArtifactResolutionException if any
-     * @throws ArtifactNotFoundException if any
+     * @throws ArtifactResolverException if any
      */
     private File getMavenSettingsJarFile()
-        throws MojoExecutionException, ProjectBuildingException, ArtifactResolutionException,
-        ArtifactNotFoundException
+        throws MojoExecutionException, ProjectBuildingException, ArtifactResolverException
     {
         return getArtifactFile( false );
     }
 
     /**
-     *
-     * @param isPom <code>true</code> to lookup the <code>maven-model</code> artifact jar, <code>false</code> to
-     * lookup the <code>maven-settings</code> artifact jar.
+     * @param isPom <code>true</code> to lookup the <code>maven-model</code> artifact jar, <code>false</code> to lookup
+     *            the <code>maven-settings</code> artifact jar.
      * @return the <code>org.apache.maven:maven-model|maven-settings</code> artifact jar file for this current
-     * HelpPlugin pom.
+     *         HelpPlugin pom.
      * @throws MojoExecutionException if any
      * @throws ProjectBuildingException if any
-     * @throws ArtifactResolutionException if any
-     * @throws ArtifactNotFoundException if any
+     * @throws ArtifactResolverException if any
      */
     private File getArtifactFile( boolean isPom )
-        throws MojoExecutionException, ProjectBuildingException, ArtifactResolutionException,
-        ArtifactNotFoundException
+        throws MojoExecutionException, ProjectBuildingException, ArtifactResolverException
     {
-        @SuppressWarnings( "unchecked" )
         List<Dependency> dependencies = getHelpPluginPom().getDependencies();
         for ( Dependency depependency : dependencies )
         {
@@ -704,12 +605,12 @@ public class EvaluateMojo
                 }
             }
 
-            Artifact mavenArtifact =
-                getArtifact( depependency.getGroupId() + ":" + depependency.getArtifactId() + ":"
-                    + depependency.getVersion() );
-            resolver.resolveAlways( mavenArtifact, remoteRepositories, localRepository );
-
-            return mavenArtifact.getFile();
+            ArtifactCoordinate coordinate =
+                getArtifactCoordinate( depependency.getGroupId(), depependency.getArtifactId(),
+                                       depependency.getVersion(), "jar" );
+            ProjectBuildingRequest pbr = new DefaultProjectBuildingRequest( session.getProjectBuildingRequest() );
+            pbr.setRemoteRepositories( remoteRepositories );
+            return artifactResolver.resolveArtifact( pbr, coordinate ).getArtifact().getFile();
         }
 
         throw new MojoExecutionException( "Unable to find the 'org.apache.maven:"
@@ -727,36 +628,33 @@ public class EvaluateMojo
         String resource = "META-INF/maven/org.apache.maven.plugins/maven-help-plugin/pom.properties";
 
         InputStream resourceAsStream = EvaluateMojo.class.getClassLoader().getResourceAsStream( resource );
-        Artifact helpPluginArtifact = null;
-        if ( resourceAsStream != null )
-        {
-            Properties properties = new Properties();
-            try
-            {
-                properties.load( resourceAsStream );
-            }
-            catch ( IOException e )
-            {
-                if ( getLog().isDebugEnabled() )
-                {
-                    getLog().debug( "IOException: " + e.getMessage(), e );
-                }
-            }
-
-            String artifactString =
-                properties.getProperty( "groupId", "unknown" ) + ":"
-                    + properties.getProperty( "artifactId", "unknown" ) + ":"
-                    + properties.getProperty( "version", "unknown" );
-
-            helpPluginArtifact = getArtifact( artifactString );
-        }
-
-        if ( helpPluginArtifact == null )
+        if ( resourceAsStream == null )
         {
             throw new MojoExecutionException( "The help plugin artifact was not found." );
         }
+        Properties properties = new Properties();
+        try
+        {
+            properties.load( resourceAsStream );
+        }
+        catch ( IOException e )
+        {
+            if ( getLog().isDebugEnabled() )
+            {
+                getLog().debug( "IOException: " + e.getMessage(), e );
+            }
+        }
+        finally
+        {
+            IOUtil.close( resourceAsStream );
+        }
 
-        return getMavenProject( helpPluginArtifact );
+        String artifactString =
+            properties.getProperty( "groupId", "unknown" ) + ":"
+                + properties.getProperty( "artifactId", "unknown" ) + ":"
+                + properties.getProperty( "version", "unknown" );
+
+        return getMavenProject( artifactString );
     }
 
     /**

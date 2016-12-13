@@ -26,9 +26,20 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.ResourceBundle;
+
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.reporting.MavenReportException;
+import org.codehaus.plexus.util.FileUtils;
+import org.codehaus.plexus.util.StringUtils;
+import org.codehaus.plexus.util.WriterFactory;
 
 import net.sourceforge.pmd.cpd.CPD;
 import net.sourceforge.pmd.cpd.CPDConfiguration;
@@ -39,16 +50,9 @@ import net.sourceforge.pmd.cpd.JavaLanguage;
 import net.sourceforge.pmd.cpd.JavaTokenizer;
 import net.sourceforge.pmd.cpd.Language;
 import net.sourceforge.pmd.cpd.LanguageFactory;
+import net.sourceforge.pmd.cpd.Match;
 import net.sourceforge.pmd.cpd.Renderer;
 import net.sourceforge.pmd.cpd.XMLRenderer;
-
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.reporting.MavenReportException;
-import org.codehaus.plexus.util.FileUtils;
-import org.codehaus.plexus.util.IOUtil;
-import org.codehaus.plexus.util.StringUtils;
-import org.codehaus.plexus.util.WriterFactory;
 
 /**
  * Creates a report for PMD's CPD tool. See <a
@@ -105,6 +109,9 @@ public class CpdReport
 
     /** The CPD instance used to analyze the files. Will itself collect the duplicated code matches. */
     private CPD cpd;
+
+    /** Helper to exclude duplications from the result. */
+    private final ExcludeDuplicationsFromFile excludeDuplicationsFromFile = new ExcludeDuplicationsFromFile();
 
     /**
      * {@inheritDoc}
@@ -240,6 +247,15 @@ public class CpdReport
                 filesToProcess = getFilesToProcess();
             }
 
+            try
+            {
+                excludeDuplicationsFromFile.loadExcludeFromFailuresData( excludeFromFailureFile );
+            }
+            catch ( MojoExecutionException e )
+            {
+                throw new MavenReportException( "Error loading exclusions", e );
+            }
+
             String encoding = determineEncoding( !filesToProcess.isEmpty() );
             Language cpdLanguage;
             if ( "java".equals ( language ) || null == language )
@@ -291,10 +307,35 @@ public class CpdReport
         }
     }
 
+    private Iterator<Match> filterMatches( Iterator<Match> matches )
+    {
+        getLog().debug( "Filtering duplications. Using " + excludeDuplicationsFromFile.countExclusions()
+            + " configured exclusions." );
+
+        List<Match> filteredMatches = new ArrayList<>();
+        int excludedDuplications = 0;
+        while ( matches.hasNext() )
+        {
+            Match match = matches.next();
+            if ( excludeDuplicationsFromFile.isExcludedFromFailure( match ) )
+            {
+                excludedDuplications++;
+            }
+            else
+            {
+                filteredMatches.add( match );
+            }
+        }
+
+        getLog().debug( "Excluded " + excludedDuplications + " duplications." );
+        return filteredMatches.iterator();
+    }
+
     private void generateReport( Locale locale )
     {
         CpdReportGenerator gen = new CpdReportGenerator( getSink(), filesToProcess, getBundle( locale ), aggregate );
-        gen.generate( cpd.getMatches() );
+        Iterator<Match> matches = cpd.getMatches();
+        gen.generate( filterMatches( matches ) );
     }
 
     private String determineEncoding( boolean showWarn )
@@ -328,17 +369,12 @@ public class CpdReport
             return;
         }
 
-        String buffer = r.render( cpd.getMatches() );
-        FileOutputStream tStream = null;
-        Writer writer = null;
-        try
+        String buffer = r.render( filterMatches( cpd.getMatches() ) );
+        File targetFile = new File( targetDirectory, "cpd." + format );
+        targetDirectory.mkdirs();
+        try ( Writer writer = new OutputStreamWriter( new FileOutputStream( targetFile ), getOutputEncoding() ) )
         {
-            targetDirectory.mkdirs();
-            File targetFile = new File( targetDirectory, "cpd." + format );
-            tStream = new FileOutputStream( targetFile );
-            writer = new OutputStreamWriter( tStream, getOutputEncoding() );
             writer.write( buffer );
-            writer.close();
 
             if ( includeXmlInSite )
             {
@@ -350,11 +386,6 @@ public class CpdReport
         catch ( IOException ioe )
         {
             throw new MavenReportException( ioe.getMessage(), ioe );
-        }
-        finally
-        {
-            IOUtil.close( writer );
-            IOUtil.close( tStream );
         }
     }
 

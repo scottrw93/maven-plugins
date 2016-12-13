@@ -126,13 +126,17 @@ public abstract class AbstractPmdReport
     private List<String> includes;
 
     /**
-     * The directories containing the sources to be compiled.
+     * Specifies the location of the source directories to be used for PMD.
+     * Defaults to <code>project.compileSourceRoots</code>.
+     * @since 3.7
      */
     @Parameter( defaultValue = "${project.compileSourceRoots}" )
     private List<String> compileSourceRoots;
 
     /**
-     * The directories containing the test-sources to be compiled.
+     * The directories containing the test-sources to be used for PMD.
+     * Defaults to <code>project.testCompileSourceRoots</code>
+     * @since 3.7
      */
     @Parameter( defaultValue = "${project.testCompileSourceRoots}" )
     private List<String> testSourceRoots;
@@ -199,6 +203,18 @@ public abstract class AbstractPmdReport
      */
     @Parameter( defaultValue = "true" )
     protected boolean skipEmptyReport;
+
+    /**
+     * File that lists classes and rules to be excluded from failures.
+     * For PMD, this is a properties file. For CPD, this
+     * is a text file that contains comma-separated lists of classes
+     * that are allowed to duplicate.
+     *
+     * @since 3.7
+     */
+    @Parameter( property = "pmd.excludeFromFailureFile", defaultValue = "" )
+    protected String excludeFromFailureFile;
+
 
     /** The files that are being analyzed. */
     protected Map<File, PmdFileInfo> filesToProcess;
@@ -282,7 +298,7 @@ public abstract class AbstractPmdReport
             excludeRoots = new File[0];
         }
 
-        Collection<File> excludeRootFiles = new HashSet<File>( excludeRoots.length );
+        Collection<File> excludeRootFiles = new HashSet<>( excludeRoots.length );
 
         for ( File file : excludeRoots )
         {
@@ -292,8 +308,12 @@ public abstract class AbstractPmdReport
             }
         }
 
-        List<PmdFileInfo> directories = new ArrayList<PmdFileInfo>();
+        List<PmdFileInfo> directories = new ArrayList<>();
 
+        if ( null == compileSourceRoots )
+        {
+            compileSourceRoots = project.getCompileSourceRoots();
+        }
         if ( compileSourceRoots != null )
         {
             for ( String root : compileSourceRoots )
@@ -305,7 +325,11 @@ public abstract class AbstractPmdReport
                     directories.add( new PmdFileInfo( project, sroot, sourceXref ) );
                 }
             }
+        }
 
+        if ( null == testSourceRoots )
+        {
+            testSourceRoots = project.getTestCompileSourceRoots();
         }
         if ( includeTests )
         {
@@ -360,7 +384,7 @@ public abstract class AbstractPmdReport
         String including = getIncludes();
         getLog().debug( "Inclusions: " + including );
 
-        Map<File, PmdFileInfo> files = new TreeMap<File, PmdFileInfo>();
+        Map<File, PmdFileInfo> files = new TreeMap<>();
 
         for ( PmdFileInfo finfo : directories )
         {
@@ -384,12 +408,21 @@ public abstract class AbstractPmdReport
         boolean returnVal = false;
         for ( File excludeDir : excludeRootFiles )
         {
-            if ( sourceDirectoryToCheck.getAbsolutePath().startsWith( excludeDir.getAbsolutePath() ) )
+            try
             {
-                getLog().debug( "Directory " + sourceDirectoryToCheck.getAbsolutePath()
-                                    + " has been excluded as it matches excludeRoot " + excludeDir.getAbsolutePath() );
-                returnVal = true;
-                break;
+                if ( sourceDirectoryToCheck.getCanonicalPath().startsWith( excludeDir.getCanonicalPath() ) )
+                {
+                    getLog().debug( "Directory " + sourceDirectoryToCheck.getAbsolutePath()
+                                        + " has been excluded as it matches excludeRoot "
+                                        + excludeDir.getAbsolutePath() );
+                    returnVal = true;
+                    break;
+                }
+            }
+            catch ( IOException e )
+            {
+                getLog().warn( "Error while checking " + sourceDirectoryToCheck
+                               + " whether it should be excluded.", e );
             }
         }
         return returnVal;
@@ -402,7 +435,7 @@ public abstract class AbstractPmdReport
      */
     private String getIncludes()
     {
-        Collection<String> patterns = new LinkedHashSet<String>();
+        Collection<String> patterns = new LinkedHashSet<>();
         if ( includes != null )
         {
             patterns.addAll( includes );
@@ -421,7 +454,7 @@ public abstract class AbstractPmdReport
      */
     private String getExcludes()
     {
-        Collection<String> patterns = new LinkedHashSet<String>( FileUtils.getDefaultExcludesAsList() );
+        Collection<String> patterns = new LinkedHashSet<>( FileUtils.getDefaultExcludesAsList() );
         if ( excludes != null )
         {
             patterns.addAll( excludes );

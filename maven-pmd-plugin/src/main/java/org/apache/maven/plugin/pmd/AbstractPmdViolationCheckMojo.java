@@ -29,7 +29,6 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.util.StringUtils;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
 /**
@@ -55,12 +54,6 @@ public abstract class AbstractPmdViolationCheckMojo<D>
     protected boolean failOnViolation;
 
     /**
-     * The project language, for determining whether to run the report.
-     */
-    @Parameter( property = "project.artifact.artifactHandler.language", required = true, readonly = true )
-    private String language;
-
-    /**
      * Whether to build an aggregated report at the root, or build individual reports.
      *
      * @since 2.2
@@ -83,13 +76,27 @@ public abstract class AbstractPmdViolationCheckMojo<D>
     private boolean printFailingErrors;
 
     /**
-     * File that lists classes and rules to be excluded from failures For PMD, this is a properties file For CPD, this
-     * is a text file that contains comma-separated lists of classes that are allowed to duplicate
+     * File that lists classes and rules to be excluded from failures.
+     * For PMD, this is a properties file. For CPD, this
+     * is a text file that contains comma-separated lists of classes
+     * that are allowed to duplicate.
      *
      * @since 3.0
      */
     @Parameter( property = "pmd.excludeFromFailureFile", defaultValue = "" )
     private String excludeFromFailureFile;
+
+    /** Helper to exclude violations from the result. */
+    private final ExcludeFromFile<D> excludeFromFile;
+
+    /**
+     * Initialize this abstact check mojo by giving the correct ExcludeFromFile helper.
+     * @param excludeFromFile the needed helper, for the specific violation type
+     */
+    protected AbstractPmdViolationCheckMojo( ExcludeFromFile<D> excludeFromFile )
+    {
+        this.excludeFromFile = excludeFromFile;
+    }
 
     /**
      * The project to analyze.
@@ -111,10 +118,7 @@ public abstract class AbstractPmdViolationCheckMojo<D>
             return;
         }
 
-        if ( !StringUtils.isEmpty( excludeFromFailureFile ) )
-        {
-            loadExcludeFromFailuresData( excludeFromFailureFile );
-        }
+        excludeFromFile.loadExcludeFromFailuresData( excludeFromFailureFile );
         final File outputFile = new File( targetDirectory, filename );
 
         if ( outputFile.exists() )
@@ -164,9 +168,6 @@ public abstract class AbstractPmdViolationCheckMojo<D>
         }
     }
 
-    protected abstract void loadExcludeFromFailuresData( String excludeFromFailureFile )
-        throws MojoExecutionException;
-
     /**
      * Method for collecting the violations found by the PMD tool
      *
@@ -179,15 +180,15 @@ public abstract class AbstractPmdViolationCheckMojo<D>
     private ViolationDetails<D> getViolations( final File analysisFile, final int failurePriority )
         throws XmlPullParserException, IOException
     {
-        final List<D> failures = new ArrayList<D>();
-        final List<D> warnings = new ArrayList<D>();
+        final List<D> failures = new ArrayList<>();
+        final List<D> warnings = new ArrayList<>();
 
         final List<D> violations = getErrorDetails( analysisFile );
 
         for ( final D violation : violations )
         {
             final int priority = getPriority( violation );
-            if ( priority <= failurePriority && !isExcludedFromFailure( violation ) )
+            if ( priority <= failurePriority && !excludeFromFile.isExcludedFromFailure( violation ) )
             {
                 failures.add( violation );
                 if ( printFailingErrors )
@@ -208,8 +209,6 @@ public abstract class AbstractPmdViolationCheckMojo<D>
     }
 
     protected abstract int getPriority( D errorDetail );
-
-    protected abstract boolean isExcludedFromFailure( D errorDetail );
 
     protected abstract ViolationDetails<D> newViolationDetailsInstance();
 

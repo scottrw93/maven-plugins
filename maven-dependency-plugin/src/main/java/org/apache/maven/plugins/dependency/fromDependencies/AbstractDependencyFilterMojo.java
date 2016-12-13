@@ -35,7 +35,6 @@ import org.apache.maven.plugins.dependency.utils.DependencyStatusSets;
 import org.apache.maven.plugins.dependency.utils.DependencyUtil;
 import org.apache.maven.plugins.dependency.utils.translators.ArtifactTranslator;
 import org.apache.maven.plugins.dependency.utils.translators.ClassifierTypeTranslator;
-import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
@@ -53,7 +52,7 @@ import org.apache.maven.shared.artifact.filter.collection.TypeFilter;
 import org.apache.maven.shared.repository.RepositoryManager;
 import org.apache.maven.shared.artifact.resolve.ArtifactResolver;
 import org.apache.maven.shared.artifact.resolve.ArtifactResolverException;
-import org.apache.maven.shared.dependency.resolve.DependencyResolver;
+import org.apache.maven.shared.dependencies.resolve.DependencyResolver;
 import org.codehaus.plexus.util.StringUtils;
 
 /**
@@ -372,9 +371,8 @@ public abstract class AbstractDependencyFilterMojo
             }
             try
             {
-                ProjectBuildingRequest buildingRequest =
-                    new DefaultProjectBuildingRequest( session.getProjectBuildingRequest() );
-                
+                ProjectBuildingRequest buildingRequest = newResolveArtifactProjectBuildingRequest();
+
                 Artifact resolvedArtifact =
                     artifactResolver.resolveArtifact( buildingRequest, project.getArtifact() ).getArtifact();
                 
@@ -468,8 +466,7 @@ public abstract class AbstractDependencyFilterMojo
     protected Set<Artifact> resolve( Set<ArtifactCoordinate> coordinates, boolean stopOnFailure )
                     throws MojoExecutionException
     {
-        ProjectBuildingRequest buildingRequest =
-                        new DefaultProjectBuildingRequest( session.getProjectBuildingRequest() );
+        ProjectBuildingRequest buildingRequest = newResolveArtifactProjectBuildingRequest();
         
         Set<Artifact> resolvedArtifacts = new HashSet<Artifact>();
         for ( ArtifactCoordinate coordinate : coordinates )

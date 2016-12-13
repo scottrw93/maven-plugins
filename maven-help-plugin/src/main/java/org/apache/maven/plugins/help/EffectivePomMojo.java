@@ -21,6 +21,8 @@ package org.apache.maven.plugins.help;
 
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
+import org.apache.maven.plugin.MojoExecution;
+import org.apache.maven.plugin.MojoExecution.Source;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -42,7 +44,7 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * Displays the effective POM as an XML for this build, with the active profiles factored in.
+ * Displays the effective POM as an XML for this build, with the active profiles factored in, or a specified artifact.
  *
  * @version $Id$
  * @since 2.0
@@ -70,6 +72,23 @@ public class EffectivePomMojo
     @Parameter( defaultValue = "${reactorProjects}", required = true, readonly = true )
     private List<MavenProject> projects;
 
+    /**
+     * This mojo execution, used to determine if it was launched from the lifecycle or the command-line.
+     */
+    @Parameter( defaultValue = "${mojo}", required = true, readonly = true )
+    private MojoExecution mojoExecution;
+
+    /**
+     * The artifact for which to display the effective POM.
+     * <br>
+     * <b>Note</b>: Should respect the Maven format, i.e. <code>groupId:artifactId[:version]</code>. The
+     * latest version of the artifact will be used when no version is specified.
+     * 
+     * @since 3.0.0
+     */
+    @Parameter( property = "artifact" )
+    private String artifact;
+
     // ----------------------------------------------------------------------
     // Public methods
     // ----------------------------------------------------------------------
@@ -78,6 +97,11 @@ public class EffectivePomMojo
     public void execute()
         throws MojoExecutionException
     {
+        if ( StringUtils.isNotEmpty( artifact ) )
+        {
+            project = getMavenProject( artifact );
+        }
+
         StringWriter w = new StringWriter();
         XMLWriter writer =
             new PrettyPrintXMLWriter( w, StringUtils.repeat( " ", XmlWriterUtil.DEFAULT_INDENTATION_SIZE ),
@@ -86,7 +110,7 @@ public class EffectivePomMojo
         writeHeader( writer );
 
         String effectivePom;
-        if ( projects.get( 0 ).equals( project ) && projects.size() > 1 )
+        if ( shouldWriteAllEffectivePOMsInReactor() )
         {
             // outer root element
             writer.startElement( "projects" );
@@ -117,24 +141,35 @@ public class EffectivePomMojo
                 throw new MojoExecutionException( "Cannot write effective-POM to output: " + output, e );
             }
 
-            if ( getLog().isInfoEnabled() )
-            {
-                getLog().info( "Effective-POM written to: " + output );
-            }
+            getLog().info( "Effective-POM written to: " + output );
         }
         else
         {
             StringBuilder message = new StringBuilder();
 
-            message.append( "\nEffective POMs, after inheritance, interpolation, and profiles are applied:\n\n" );
+            message.append( LS );
+            message.append( "Effective POMs, after inheritance, interpolation, and profiles are applied:" );
+            message.append( LS ).append( LS );
             message.append( effectivePom );
-            message.append( "\n" );
+            message.append( LS );
 
-            if ( getLog().isInfoEnabled() )
-            {
-                getLog().info( message.toString() );
-            }
+            getLog().info( message.toString() );
         }
+    }
+
+    /**
+     * Determines if all effective POMs of all the projects in the reactor should be written. When this goal is started
+     * on the command-line, it is always the case. However, when it is bound to a phase in the lifecycle, it is only the
+     * case when the current project being built is the head project in the reactor.
+     * 
+     * @return <code>true</code> if all effective POMs should be written, <code>false</code> otherwise.
+     */
+    private boolean shouldWriteAllEffectivePOMsInReactor()
+    {
+        Source source = mojoExecution.getSource();
+        // [MNG-5550] For Maven < 3.2.1, the source is null, instead of LIFECYCLE: only rely on comparisons with CLI
+        return projects.size() > 1
+            && ( source == Source.CLI || source != Source.CLI && projects.get( 0 ).equals( project ) );
     }
 
     // ----------------------------------------------------------------------

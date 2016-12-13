@@ -25,12 +25,12 @@
   <parent>
     <artifactId>maven-plugins</artifactId>
     <groupId>org.apache.maven.plugins</groupId>
-    <version>28</version>
+    <version>30</version>
     <relativePath>../../pom/maven/maven-plugins/pom.xml</relativePath>
   </parent>
 
   <artifactId>maven-ear-plugin</artifactId>
-  <version>2.10.2-SNAPSHOT</version>
+  <version>3.0.0-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>Apache Maven EAR Plugin</name>
@@ -75,8 +75,8 @@
   </contributors>
 
   <properties>
-    <mavenArchiverVersion>3.0.0</mavenArchiverVersion>
-    <mavenFilteringVersion>3.0.0</mavenFilteringVersion>
+    <mavenArchiverVersion>3.1.1</mavenArchiverVersion>
+    <mavenFilteringVersion>3.1.1</mavenFilteringVersion>
     <mavenVersion>3.0</mavenVersion>
   </properties>
 
@@ -109,12 +109,12 @@
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-archiver</artifactId>
-      <version>3.0.3</version>
+      <version>3.4</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-utils</artifactId>
-      <version>3.0.22</version>
+      <version>3.0.24</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
@@ -124,7 +124,7 @@
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-interpolation</artifactId>
-      <version>1.22</version>
+      <version>1.24</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
@@ -195,6 +195,12 @@
         <localRepositoryPath>${project.build.testOutputDirectory}/m2repo</localRepositoryPath>
       </properties>
       <build>
+        <resources>
+          <resource>
+            <directory>src/main/filtered-resources</directory>
+            <filtering>true</filtering>
+          </resource>
+        </resources>
         <testResources>
           <testResource>
             <directory>src/test/resources</directory>

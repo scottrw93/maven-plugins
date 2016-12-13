@@ -25,6 +25,7 @@ import java.lang.reflect.Field;
 import java.util.List;
 
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -32,11 +33,14 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.dependency.utils.DependencySilentLog;
+import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuildingRequest;
 import org.codehaus.plexus.archiver.ArchiverException;
 import org.codehaus.plexus.archiver.UnArchiver;
 import org.codehaus.plexus.archiver.manager.ArchiverManager;
 import org.codehaus.plexus.archiver.manager.NoSuchArchiverException;
+import org.codehaus.plexus.archiver.zip.ZipUnArchiver;
 import org.codehaus.plexus.components.io.fileselectors.IncludeExcludeFileSelector;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.ReflectionUtils;
@@ -78,6 +82,12 @@ public abstract class AbstractDependencyMojo
      */
     @Parameter( defaultValue = "${project}", readonly = true, required = true )
     private MavenProject project;
+    
+    /**
+     * Remote repositories which will be searched for artifacts.
+     */
+    @Parameter( defaultValue = "${project.remoteArtifactRepositories}", readonly = true, required = true )
+    private List<ArtifactRepository> remoteRepositories;
 
     /**
      * Contains the full list of projects in the reactor.
@@ -176,10 +186,10 @@ public abstract class AbstractDependencyMojo
         }
     }
 
-    protected void unpack( Artifact artifact, File location )
+    protected void unpack( Artifact artifact, File location, String encoding )
         throws MojoExecutionException
     {
-        unpack( artifact, location, null, null );
+        unpack( artifact, location, null, null, encoding );
     }
 
     /**
@@ -191,15 +201,17 @@ public abstract class AbstractDependencyMojo
      *                 **&#47;*.properties</code>
      * @param excludes Comma separated list of file patterns to exclude i.e. <code>**&#47;*.xml,
      *                 **&#47;*.properties</code>
+     * @param encoding Encoding of artifact. Set {@code null} for default encoding.
      */
-    protected void unpack( Artifact artifact, File location, String includes, String excludes )
+    protected void unpack( Artifact artifact, File location, String includes, String excludes, String encoding )
         throws MojoExecutionException
     {
-        unpack( artifact, artifact.getType(), location, includes, excludes );
+        unpack( artifact, artifact.getType(), location, includes, excludes, encoding );
     }
-    
-    protected void unpack( Artifact artifact, String type, File location, String includes, String excludes )
-                    throws MojoExecutionException
+
+    protected void unpack( Artifact artifact, String type, File location, String includes, String excludes,
+                           String encoding )
+        throws MojoExecutionException
     {
         File file = artifact.getFile(); 
         try
@@ -226,6 +238,12 @@ public abstract class AbstractDependencyMojo
             {
                 unArchiver = archiverManager.getUnArchiver( file );
                 getLog().debug( "Found unArchiver by extension: " + unArchiver );
+            }
+
+            if ( encoding != null && unArchiver instanceof ZipUnArchiver )
+            {
+                ( (ZipUnArchiver) unArchiver ).setEncoding( encoding );
+                getLog().info( "Unpacks '" + type + "' with encoding '" + encoding + "'." );
             }
 
             unArchiver.setUseJvmChmod( useJvmChmod );
@@ -289,6 +307,20 @@ public abstract class AbstractDependencyMojo
         {
             // was a nice try. Don't bother logging because the log is silent.
         }
+    }
+
+    /**
+     * @return Returns a new ProjectBuildingRequest populated from the current session and the current project remote
+     *         repositories, used to resolve artifacts.
+     */
+    public ProjectBuildingRequest newResolveArtifactProjectBuildingRequest()
+    {
+        ProjectBuildingRequest buildingRequest =
+            new DefaultProjectBuildingRequest( session.getProjectBuildingRequest() );
+
+        buildingRequest.setRemoteRepositories( remoteRepositories );
+
+        return buildingRequest;
     }
 
     /**

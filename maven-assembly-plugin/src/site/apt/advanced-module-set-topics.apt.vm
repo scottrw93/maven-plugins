@@ -3,7 +3,7 @@
   ---
   John Casey
   ---
-  1 December 2006
+  2006-12-01
   ---
 
 ~~ Licensed to the Apache Software Foundation (ASF) under one
@@ -37,7 +37,7 @@ Advanced Module-Set Topics
 
 * Including and Excluding Modules using a ModuleSet
 
-  As you are no doubt aware, Maven 2.0 introduces advanced handling of
+  As you are no doubt aware, Maven introduces advanced handling of
   multimodule builds. These are builds which contain multiple, often
   interrelated projects. In these builds, project hierarchy is established
   through use of the <<<modules>>> section of the POM, where parent POMs specify
@@ -76,9 +76,9 @@ Advanced Module-Set Topics
   We can select <<just>> the child1 module using the following <<<moduleSet>>>:
 
 ---
-<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion}"
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/${mdoVersion}"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
   [...]
   <moduleSets>
     [...]
@@ -128,9 +128,9 @@ ${module.groupId}-${module.artifactId}-${module.version}.${module.extension}
   Will result in a file called <<<org.test-project-1.0.jar>>> being created
   within the assembly.
 
-  <NOTE: The expression <<<$\{module.extension\}>>> is mapped to the file extension
-  supplied by the ArtifactHandler for the type <<<jar>>>. It's important to
-  remember that the file extension <<need not be .jar>>.>
+  <NOTE: The expression> <<<$\{module.extension\}>>> <is mapped to the file extension
+  supplied by the ArtifactHandler for the type> <<<jar>>>. <It's important to
+  remember that the file extension> <<need not be .jar>><.>
 
 * {Including Module Sources}
 
@@ -160,9 +160,9 @@ ${module.groupId}-${module.artifactId}-${module.version}.${module.extension}
   reference for your project to users.
 
 ---
-<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion}"
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/${mdoVersion}"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
   [...]
   <moduleSets>
     [...]
@@ -188,9 +188,9 @@ ${module.groupId}-${module.artifactId}-${module.version}.${module.extension}
   own.
 
 ---
-<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion}"
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/${mdoVersion}"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
   [...]
   <moduleSets>
     [...]
@@ -232,9 +232,9 @@ ${module.groupId}-${module.artifactId}-${module.version}.${module.extension}
   multimodule hierarchy.
 
 ---
-<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion}"
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/${mdoVersion}"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
   [...]
   <moduleSets>
     [...]
@@ -337,9 +337,9 @@ ${module.groupId}-${module.artifactId}-${module.version}.${module.extension}
   <<<excludeSubModuleDirectories>>> flag, as follows:
 
 ---
-<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion}"
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/${mdoVersion}"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
   [...]
   <moduleSets>
     [...]
@@ -362,7 +362,7 @@ ${module.groupId}-${module.artifactId}-${module.version}.${module.extension}
 
 * {Including Module Binaries}
 
-  *WARNING!* Using the <<<binaries>>> section of a <<<moduleSet>>> definition
+  <<WARNING!>> Using the <<<binaries>>> section of a <<<moduleSet>>> definition
   involves some tricky considerations that are a result of the way Maven
   sorts and executes project builds within a multimodule context. Please
   read {{{./faq.html#module-binaries}this FAQ entry}} if you decide to use them.
@@ -419,9 +419,9 @@ ${module.groupId}-${module.artifactId}-${module.version}.${module.extension}
   of the main project artifact.
 
 ---
-<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion}"
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/${mdoVersion}"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
   [...]
   <moduleSets>
     <moduleSet>
@@ -474,9 +474,9 @@ ${module.groupId}-${module.artifactId}-${module.version}.${module.extension}
   module's dependencies in the current assembly.
 
 ---
-<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion}"
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/${mdoVersion}"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
   [...]
   <moduleSets>
     <moduleSet>
@@ -494,7 +494,7 @@ ${module.groupId}-${module.artifactId}-${module.version}.${module.extension}
 </assembly>
 ---
 
-  <NOTE: The <<<binaries>>> section still accommodates direct <<<\<includes/\>>>>
-  and <<<\<excludes/\>>>> subsections, for specifying which module-dependencies
+  <NOTE: The> <<<binaries>>> <section still accommodates direct> <<<\<includes/\>>>>
+  <and> <<<\<excludes/\>>>> <subsections, for specifying which module-dependencies
   to include in the assembly. However, these are deprecated, and only provided
   for backward compatibility.>

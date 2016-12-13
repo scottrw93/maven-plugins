@@ -35,7 +35,8 @@ import java.util.List;
  * @author <a href="michal.maczka@dimatics.com">Michal Maczka</a>
  * @author <a href="mailto:jason@maven.org">Jason van Zyl</a>
  */
-@Mojo( name = "testResources", defaultPhase = LifecyclePhase.PROCESS_TEST_RESOURCES, threadSafe = true )
+@Mojo( name = "testResources", defaultPhase = LifecyclePhase.PROCESS_TEST_RESOURCES, requiresProject = true,
+       threadSafe = true )
 public class TestResourcesMojo
     extends ResourcesMojo
 {
@@ -56,7 +57,7 @@ public class TestResourcesMojo
      * Its use is NOT RECOMMENDED, but quite convenient on occasion.
      * @since 2.6
      */
-    @Parameter( property = "maven.test.skip" )
+    @Parameter( property = "maven.test.skip", defaultValue = "false" )
     private boolean skip;
 
     /**
@@ -75,21 +76,25 @@ public class TestResourcesMojo
         }
     }
 
+    /** {@inheritDoc} */
     public File getOutputDirectory()
     {
         return outputDirectory;
     }
 
+    /** {@inheritDoc} */
     public void setOutputDirectory( File outputDirectory )
     {
         this.outputDirectory = outputDirectory;
     }
 
+    /** {@inheritDoc} */
     public List<Resource> getResources()
     {
         return resources;
     }
 
+    /** {@inheritDoc} */
     public void setResources( List<Resource> resources )
     {
         this.resources = resources;

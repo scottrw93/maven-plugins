@@ -3,7 +3,7 @@
  ------
   Edwin Punzalan
  ------
-  26-July-2006
+  2006-07-26
  ------
 
 ~~ Licensed to the Apache Software Foundation (ASF) under one
@@ -44,9 +44,9 @@ Using Repositories
   A functional repository archive for your project can be created with:
 
 +-----
-<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion}"
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/${mdoVersion}"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/${mdoVersion} http://maven.apache.org/xsd/assembly-${mdoVersion}.xsd">
   <id>repository</id>
   <formats>
     <format>jar</format>
@@ -95,7 +95,7 @@ Using Repositories
   The assembly archive is then created using:
 
 +-----
-mvn assembly:assembly
+mvn clean assembly:single
 +-----
 
   The generated archive can be extracted to an internal repository so users of

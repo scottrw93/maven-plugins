@@ -30,7 +30,7 @@ under the License.
   </parent>
 
   <artifactId>maven-project-info-reports-plugin</artifactId>
-  <version>2.9-SNAPSHOT</version>
+  <version>2.10-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>Apache Maven Project Info Reports Plugin</name>
@@ -86,6 +86,9 @@ under the License.
       <name>Simon Wang</name>
       <email>wangyf2010@gmail.com</email>
     </contributor>
+    <contributor>
+      <name>Alix Lourme</name>
+    </contributor>
   </contributors>
 
   <prerequisites>
@@ -109,7 +112,6 @@ under the License.
   </distributionManagement>
 
   <properties>
-    <javaVersion>5</javaVersion>
     <doxiaVersion>1.6</doxiaVersion>
     <doxia-sitetoolsVersion>1.6</doxia-sitetoolsVersion>
     <mavenVersion>2.2.1</mavenVersion>
@@ -334,12 +336,12 @@ under the License.
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-utils</artifactId>
-      <version>3.0.20</version>
+      <version>3.0.24</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-interpolation</artifactId>
-      <version>1.21</version>
+      <version>1.24</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
@@ -558,6 +560,7 @@ under the License.
               <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>
               <pomIncludes>
                 <pomInclude>*/pom.xml</pomInclude>
+                <pomInclude>*/parent/pom.xml</pomInclude>
               </pomIncludes>
               <pomExcludes>
                 <pomExclude>pom.xml</pomExclude>

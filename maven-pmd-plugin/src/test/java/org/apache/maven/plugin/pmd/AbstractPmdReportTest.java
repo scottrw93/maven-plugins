@@ -29,7 +29,6 @@ import org.apache.maven.doxia.siterenderer.RendererException;
 import org.apache.maven.doxia.siterenderer.SiteRenderingContext;
 import org.apache.maven.doxia.siterenderer.sink.SiteRendererSink;
 import org.apache.maven.plugin.testing.AbstractMojoTestCase;
-import org.codehaus.plexus.util.IOUtil;
 import org.codehaus.plexus.util.WriterFactory;
 
 /**
@@ -51,22 +50,29 @@ public abstract class AbstractPmdReportTest
     protected void renderer( AbstractPmdReport mojo, File outputHtml )
         throws RendererException, IOException
     {
-        Writer writer = null;
         SiteRenderingContext context = new SiteRenderingContext();
         context.setDecoration( new DecorationModel() );
         context.setTemplateName( "org/apache/maven/doxia/siterenderer/resources/default-site.vm" );
         context.setLocale( Locale.ENGLISH );
+        
+        outputHtml.getParentFile().mkdirs();
 
-        try
+        try ( Writer writer = WriterFactory.newXmlWriter( outputHtml ) )
         {
-            outputHtml.getParentFile().mkdirs();
-            writer = WriterFactory.newXmlWriter( outputHtml );
-
             mojo.getSiteRenderer().generateDocument( writer, (SiteRendererSink) mojo.getSink(), context );
         }
-        finally
-        {
-            IOUtil.close( writer );
-        }
+    }
+
+    /**
+     * Checks, whether the string <code>contained</code> is contained in
+     * the given <code>text</code> ignoring case.
+     *
+     * @param text the string in which the search is executed
+     * @param contained the string, the should be searched
+     * @return <code>true</code> if the string is contained, otherwise <code>false</code>.
+     */
+    public static boolean lowerCaseContains( String text, String contains )
+    {
+        return text.toLowerCase( Locale.ROOT ).contains( contains.toLowerCase( Locale.ROOT ) );
     }
 }

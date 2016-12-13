@@ -54,12 +54,6 @@ public class CompilerMojo
     private List<String> compileSourceRoots;
 
     /**
-     * Project classpath.
-     */
-    @Parameter( defaultValue = "${project.compileClasspathElements}", readonly = true, required = true )
-    private List<String> classpathElements;
-
-    /**
      * The directory for compiled classes.
      */
     @Parameter( defaultValue = "${project.build.outputDirectory}", required = true, readonly = true )
@@ -103,6 +97,13 @@ public class CompilerMojo
     @Parameter ( property = "maven.main.skip" )
     private boolean skipMain;
 
+    @Parameter( defaultValue = "${project.compileClasspathElements}", readonly = true, required = true )
+    private List<String> compilePath;
+    
+    private List<String> classpathElements;
+
+    private List<String> modulepathElements;
+    
     protected List<String> getCompileSourceRoots()
     {
         return compileSourceRoots;
@@ -111,6 +112,12 @@ public class CompilerMojo
     protected List<String> getClasspathElements()
     {
         return classpathElements;
+    }
+
+    @Override
+    protected List<String> getModulepathElements()
+    {
+        return modulepathElements;
     }
 
     protected File getOutputDirectory()
@@ -126,12 +133,42 @@ public class CompilerMojo
             getLog().info( "Not compiling main sources" );
             return;
         }
+
         super.execute();
 
         if ( outputDirectory.isDirectory() )
         {
             projectArtifact.setFile( outputDirectory );
         }
+    }
+    
+    @Override
+    protected void preparePaths( Set<File> sourceFiles )
+    {
+        assert compilePath != null;
+        
+        boolean hasModuleDescriptor = false;
+        for ( File sourceFile : sourceFiles )
+        {
+            if ( "module-info.java".equals( sourceFile.getName() ) )
+            {
+                hasModuleDescriptor = true;
+                break;
+            }
+        }
+
+        if ( hasModuleDescriptor )
+        {
+            modulepathElements = compilePath;
+            classpathElements = Collections.emptyList();
+        }
+        else
+        {
+            classpathElements = compilePath;
+            modulepathElements = Collections.emptyList();
+        }
+        
+        getLog().debug( "classpathElements: " + getClasspathElements() );
     }
 
     protected SourceInclusionScanner getSourceInclusionScanner( int staleMillis )
@@ -187,6 +224,13 @@ public class CompilerMojo
     {
         return target;
     }
+    
+    @Override
+    protected String getRelease()
+    {
+        return release;
+    }
+    
 
     protected String getCompilerArgument()
     {

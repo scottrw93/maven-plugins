@@ -25,12 +25,12 @@ under the License.
   <parent>
     <artifactId>maven-plugins</artifactId>
     <groupId>org.apache.maven.plugins</groupId>
-    <version>28</version>
+    <version>30</version>
     <relativePath>../../pom/maven/maven-plugins/pom.xml</relativePath>
   </parent>
 
   <artifactId>maven-dependency-plugin</artifactId>
-  <version>3.0-SNAPSHOT</version>
+  <version>3.0.1-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>Apache Maven Dependency Plugin</name>
@@ -75,14 +75,15 @@ under the License.
     <contributor>
       <name>Holger Mense</name>
     </contributor>
+    <contributor>
+      <name>Markus Karg</name>
+    </contributor>
   </contributors>
 
   <properties>
     <mavenVersion>3.0</mavenVersion>
     <doxiaVersion>1.4</doxiaVersion>
     <pluginTestingVersion>2.1</pluginTestingVersion>
-    <maven.compiler.source>1.6</maven.compiler.source>
-    <maven.compiler.target>1.6</maven.compiler.target>
   </properties>
 
   <dependencies>
@@ -153,7 +154,7 @@ under the License.
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
-      <version>1.4</version>
+      <version>2.5</version>
     </dependency>
 
     <!-- doxia -->
@@ -172,12 +173,12 @@ under the License.
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-archiver</artifactId>
-      <version>3.0.3</version>
+      <version>3.4</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-utils</artifactId>
-      <version>3.0.22</version>
+      <version>3.0.24</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
@@ -221,7 +222,7 @@ under the License.
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
       <artifactId>maven-artifact-transfer</artifactId>
-      <version>3.0-SNAPSHOT</version>
+      <version>0.9.0</version>
     </dependency>
 
     <dependency>
@@ -233,7 +234,7 @@ under the License.
     <dependency>
       <groupId>commons-collections</groupId>
       <artifactId>commons-collections</artifactId>
-      <version>3.2.1</version>
+      <version>3.2.2</version>
     </dependency>
 
     <dependency>
@@ -271,7 +272,7 @@ under the License.
    <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-interpolation</artifactId>
-      <version>1.21</version>
+      <version>1.24</version>
       <scope>test</scope>
     </dependency>
 
@@ -364,6 +365,10 @@ under the License.
                 <!-- verbose was using Maven2 code, removed with MDEP-494, requires MSHARED-339 to be fixed first -->
                 <pomExclude>tree-verbose/pom.xml</pomExclude>
               </pomExcludes>
+              <pomIncludes>
+                <pomInclude>*/pom.xml</pomInclude>
+                <pomInclude>purge-local-repository-without-pom</pomInclude>
+              </pomIncludes>
               <!-- for mrm -->
               <settingsFile>src/it/mrm/settings.xml</settingsFile>
               <filterProperties>
@@ -374,7 +379,7 @@ under the License.
           <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>mrm-maven-plugin</artifactId>
-            <version>1.0-beta-2</version>
+            <version>1.0.0</version>
             <executions>
               <execution>
                 <goals>

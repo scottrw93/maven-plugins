@@ -35,17 +35,6 @@ import java.util.List;
  */
 public interface AssemblerConfigurationSource
 {
-
-    /**
-     * @return The descriptor.
-     */
-    String getDescriptor();
-
-    /**
-     * @return The descriptor id.
-     */
-    String getDescriptorId();
-
     /**
      * @return The descriptors.
      */
@@ -72,11 +61,6 @@ public interface AssemblerConfigurationSource
     MavenProject getProject();
 
     /**
-     * @return Site included.
-     */
-    boolean isSiteIncluded();
-
-    /**
      * @return The site directory.
      */
     File getSiteDirectory();
@@ -90,11 +74,6 @@ public interface AssemblerConfigurationSource
      * @return append the assembly id.
      */
     boolean isAssemblyIdAppended();
-
-    /**
-     * @return The classifier.
-     */
-    String getClassifier();
 
     /**
      * @return Tar long file mode.

@@ -19,6 +19,8 @@ package org.apache.maven.plugins.site.render;
  * under the License.
  */
 
+import static org.apache.maven.shared.utils.logging.MessageUtils.buffer;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -202,10 +204,10 @@ public class ReportDocumentRenderer
         Locale locale = siteRenderingContext.getLocale();
         String localReportName = report.getName( locale );
 
-        String msg = "Generating \"" + localReportName + "\" report";
+        String msg = "Generating \"" + buffer().strong( localReportName ) + "\" report";
         // CHECKSTYLE_OFF: MagicNumber
         log.info( reportMojoInfo == null ? ( msg + '.' )
-                        : ( StringUtils.rightPad( msg, 40 ) + " --- " + reportMojoInfo ) );
+                        : ( StringUtils.rightPad( msg, 40 ) + buffer().strong( " --- " ).mojo( reportMojoInfo ) ) );
         // CHECKSTYLE_ON: MagicNumber
 
         // main sink
@@ -285,11 +287,19 @@ public class ReportDocumentRenderer
                 {
                     out = WriterFactory.newWriter( outputFile, siteRenderingContext.getOutputEncoding() );
                     renderer.generateDocument( out, mySink, siteRenderingContext );
+                    mySink.close();
+                    mySink = null;
+                    out.close();
+                    out = null;
                 }
                 finally
                 {
-                    mySink.close();
                     IOUtil.close( out );
+
+                    if ( mySink != null )
+                    {
+                        mySink.close();
+                    }
                 }
             }
         }

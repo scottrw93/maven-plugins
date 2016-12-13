@@ -103,23 +103,9 @@ public class DefaultAssemblyReader
 
         final List<Assembly> assemblies = new ArrayList<Assembly>();
 
-        final String descriptor = configSource.getDescriptor();
-        final String descriptorId = configSource.getDescriptorId();
         final String[] descriptors = configSource.getDescriptors();
         final String[] descriptorRefs = configSource.getDescriptorReferences();
         final File descriptorSourceDirectory = configSource.getDescriptorSourceDirectory();
-
-        if ( descriptor != null )
-        {
-            locator.setStrategies( strategies );
-            addAssemblyFromDescriptor( descriptor, locator, configSource, assemblies );
-        }
-
-        if ( descriptorId != null )
-        {
-            locator.setStrategies( refStrategies );
-            addAssemblyForDescriptorReference( descriptorId, configSource, assemblies );
-        }
 
         if ( ( descriptors != null ) && ( descriptors.length > 0 ) )
         {
@@ -230,7 +216,8 @@ public class DefaultAssemblyReader
         {
             reader = ReaderFactory.newXmlReader( resourceAsStream );
             final Assembly assembly = readAssembly( reader, ref, null, configSource );
-
+            reader.close();
+            reader = null;
             assemblies.add( assembly );
             return assembly;
         }
@@ -267,8 +254,12 @@ public class DefaultAssemblyReader
         try
         {
             r = ReaderFactory.newXmlReader( descriptor );
+
             final Assembly assembly =
                 readAssembly( r, descriptor.getAbsolutePath(), descriptor.getParentFile(), configSource );
+
+            r.close();
+            r = null;
 
             assemblies.add( assembly );
 
@@ -319,6 +310,9 @@ public class DefaultAssemblyReader
 
             final Assembly assembly = readAssembly( r, spec, dir, configSource );
 
+            r.close();
+            r = null;
+
             assemblies.add( assembly );
 
             return assembly;
@@ -334,9 +328,9 @@ public class DefaultAssemblyReader
 
     }
 
-    public Assembly readAssembly( final Reader reader, final String locationDescription, final File assemblyDir,
+    public Assembly readAssembly( Reader reader, final String locationDescription, final File assemblyDir,
                                   final AssemblerConfigurationSource configSource )
-                                      throws AssemblyReadException, InvalidAssemblerConfigurationException
+        throws AssemblyReadException, InvalidAssemblerConfigurationException
     {
         Assembly assembly;
 
@@ -364,6 +358,8 @@ public class DefaultAssemblyReader
 
             AssemblyInterpolator.checkErrors( AssemblyId.createAssemblyId( assembly ), is, getLogger() );
 
+            reader.close();
+            reader = null;
         }
         catch ( final IOException e )
         {
@@ -380,7 +376,7 @@ public class DefaultAssemblyReader
             IOUtil.close( reader );
         }
 
-        if ( configSource.isSiteIncluded() || assembly.isIncludeSiteDirectory() )
+        if ( assembly.isIncludeSiteDirectory() )
         {
             includeSiteInAssembly( assembly, configSource );
         }

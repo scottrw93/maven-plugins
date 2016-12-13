@@ -30,7 +30,7 @@ ${project.name}
 
   This plugin provides the capability to build jars.
   If you like to sign jars please use the 
-  {{{http://maven.apache.org/plugins/maven-jarsigner-plugin/}Maven Jarsigner Plugin}}.
+  {{{/plugins/maven-jarsigner-plugin/}Maven Jarsigner Plugin}}.
 
 * Goals Overview
 
@@ -40,12 +40,42 @@ ${project.name}
 
   []
 
+* Major Version Upgrade to version 3.0.0
+
+  Please note that the following parameter has been completely removed from the plugin configuration:
+
+  * useDefaultManifestFile
+
+  If you need to define your own <<MANIFEST.MF>> file you can simply achieve that via
+  {{{http://maven.apache.org/shared/maven-archiver/index.html}Maven Archiver}} configuration
+  like in the following example:
+
++-----------------+
+<project>
+  ...
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>${project.version}</version>
+        <configuration>
+          <archive>
+            <manifestFile>\${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
+          </archive>
+        </configuration>
+        ...
+      </plugin>
+    </plugins>
+  </build>
+  ...
+</project>
++-----------------+
+
 * Usage
 
   General instructions on how to use the JAR Plugin can be found on the {{{./usage.html}usage page}}. Some more
-  specific use cases are described in the examples given below. Last but not least, users occasionally contribute
-  additional examples, tips or errata to the
-  {{{http://docs.codehaus.org/display/MAVENUSER/JAR+Plugin}plugin's wiki page}}.
+  specific use cases are described in the examples given below. 
 
   In case you still have questions regarding the plugin's usage, please have a look at the {{{./faq.html}FAQ}} and feel
   free to contact the {{{./mail-lists.html}user mailing list}}. The posts to the mailing list are archived and could
@@ -64,9 +94,9 @@ ${project.name}
 
   The plugin use Maven Archiver to handle jar content and manifest configuration.
 
-  You can have a look at the {{{http://maven.apache.org/shared/maven-archiver/}Maven Archiver Documentation}} to understand how to setup this.
+  You can have a look at the {{{/shared/maven-archiver/}Maven Archiver Documentation}} to understand how to setup this.
 
-  You might also want to consult the {{{http://maven.apache.org/guides/mini/guide-manifest.html}Guide
+  You might also want to consult the {{{/guides/mini/guide-manifest.html}Guide
   to Working with Manifests}}.
 
 * Examples
@@ -75,8 +105,6 @@ ${project.name}
   you can take a look at the following examples:
 
   * {{{./examples/manifest-customization.html}Manifest Customization}}
-
-  * {{{./examples/default-manifest-file.html}Using a Default Manifest File}}
 
   * {{{./examples/include-exclude.html}Howto include/exclude Content from a jar archive}}
 

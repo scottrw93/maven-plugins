@@ -25,12 +25,12 @@ under the License.
   <parent>
     <artifactId>maven-plugins</artifactId>
     <groupId>org.apache.maven.plugins</groupId>
-    <version>28</version>
+    <version>30</version>
     <relativePath>../../pom/maven/maven-plugins/pom.xml</relativePath>
   </parent>
 
   <artifactId>maven-resources-plugin</artifactId>
-  <version>2.8-SNAPSHOT</version>
+  <version>3.0.3-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>Apache Maven Resources Plugin</name>
@@ -65,13 +65,8 @@ under the License.
   </distributionManagement>
 
   <properties>
-    <mavenFilteringVersion>3.1.0-SNAPSHOT</mavenFilteringVersion>
+    <mavenFilteringVersion>3.1.1</mavenFilteringVersion>
     <mavenVersion>3.0</mavenVersion>
-    <!--
-      ! Here we start with JDK 6 for release 3.X
-    -->
-    <maven.compiler.target>1.6</maven.compiler.target>
-    <maven.compiler.source>1.6</maven.compiler.source>
   </properties>
 
   <contributors>
@@ -93,16 +88,6 @@ under the License.
     </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
-      <artifactId>maven-artifact</artifactId>
-      <version>${mavenVersion}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.maven</groupId>
-      <artifactId>maven-settings</artifactId>
-      <version>${mavenVersion}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
       <version>${mavenVersion}</version>
     </dependency>
@@ -116,7 +101,7 @@ under the License.
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-utils</artifactId>
-      <version>3.0.22</version>
+      <version>3.0.24</version>
     </dependency>
 
     <dependency>
@@ -124,11 +109,18 @@ under the License.
       <artifactId>maven-filtering</artifactId>
       <version>${mavenFilteringVersion}</version>
     </dependency>
+    <!-- Upgrade of transitive commons-io 2.4 of maven-shared-utils of maven-filtering. -->
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.5</version>
+      <scope>compile</scope>
+    </dependency>
 
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-interpolation</artifactId>
-      <version>1.21</version>
+      <version>1.24</version>
     </dependency>
 
     <dependency>
@@ -141,12 +133,6 @@ under the License.
       <groupId>org.apache.maven.plugin-testing</groupId>
       <artifactId>maven-plugin-testing-harness</artifactId>
       <version>2.1</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-      <version>2.4</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -169,6 +155,7 @@ under the License.
               <configuration>
                 <debug>true</debug>
                 <postBuildHookScript>verify</postBuildHookScript>
+                <preBuildHookScript>setup</preBuildHookScript>
                 <localRepositoryPath>${project.build.directory}/local-repo</localRepositoryPath>
                 <goals>
                   <goal>clean</goal>
@@ -184,6 +171,9 @@ under the License.
           </plugins>
         </pluginManagement>
         <plugins>
+          <!--
+           ! The following is used within the src/it/user-filters test.
+          -->
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-jar-plugin</artifactId>
@@ -198,7 +188,6 @@ under the License.
           <plugin>
             <groupId>org.codehaus.plexus</groupId>
             <artifactId>plexus-component-metadata</artifactId>
-            <version>1.6</version>
             <executions>
               <execution>
                 <goals>

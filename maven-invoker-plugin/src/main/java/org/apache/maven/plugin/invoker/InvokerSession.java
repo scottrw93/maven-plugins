@@ -19,6 +19,8 @@ package org.apache.maven.plugin.invoker;
  * under the License.
  */
 
+import static org.apache.maven.shared.utils.logging.MessageUtils.buffer;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -196,7 +198,7 @@ class InvokerSession
     {
         updateStats();
 
-        String separator = "-------------------------------------------------";
+        String separator = buffer().strong( "-------------------------------------------------" ).toString();
 
         logger.info( separator );
         logger.info( "Build Summary:" );

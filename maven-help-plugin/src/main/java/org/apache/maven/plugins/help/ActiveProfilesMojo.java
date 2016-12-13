@@ -20,15 +20,10 @@ package org.apache.maven.plugins.help;
  */
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.time.DateFormatUtils;
-import org.apache.maven.model.Profile;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -68,15 +63,15 @@ public class ActiveProfilesMojo
         {
             getActiveProfileStatement( project, message );
 
-            message.append( "\n\n" );
+            message.append( LS ).append( LS );
         }
 
         if ( output != null )
         {
             String formattedDateTime = DateFormatUtils.ISO_DATETIME_FORMAT.format( System.currentTimeMillis() );
             StringBuilder sb = new StringBuilder();
-            sb.append( "Created by: " ).append( getClass().getName() ).append( "\n" );
-            sb.append( "Created on: " ).append( formattedDateTime ).append( "\n" ).append( "\n" );
+            sb.append( "Created by: " ).append( getClass().getName() ).append( LS );
+            sb.append( "Created on: " ).append( formattedDateTime ).append( LS ).append( LS );
             sb.append( message.toString() );
 
             try
@@ -88,17 +83,11 @@ public class ActiveProfilesMojo
                 throw new MojoExecutionException( "Cannot write active profiles to output: " + output, e );
             }
 
-            if ( getLog().isInfoEnabled() )
-            {
-                getLog().info( "Active profile report written to: " + output );
-            }
+            getLog().info( "Active profile report written to: " + output );
         }
         else
         {
-            if ( getLog().isInfoEnabled() )
-            {
-                getLog().info( message );
-            }
+            getLog().info( message );
         }
     }
 
@@ -114,33 +103,11 @@ public class ActiveProfilesMojo
      */
     private void getActiveProfileStatement( MavenProject project, StringBuilder message )
     {
-        Map<String, List<String>> activeProfileIds = new LinkedHashMap<String, List<String>>();
-        try
-        {
-            activeProfileIds.putAll( getInjectedProfileIds( project ) );
-        }
-        catch ( UnsupportedOperationException uoe )
-        {
-            // Fall back to M2 approach
-            @SuppressWarnings( "unchecked" )
-            List<Profile> profiles = new ArrayList<Profile>( project.getActiveProfiles() );
-
-            for ( Profile profile : profiles )
-            {
-                List<String> profileIds = activeProfileIds.get( profile.getSource() );
-                if ( profileIds == null )
-                {
-                    profileIds = new ArrayList<String>();
-                    activeProfileIds.put( profile.getSource(), profileIds );
-                }
-                profileIds.add( profile.getId() );
-            }
-        }
-
-
-        message.append( "\n" );
-
-        message.append( "Active Profiles for Project \'" ).append( project.getId() ).append( "\': \n\n" );
+        Map<String, List<String>> activeProfileIds = project.getInjectedProfileIds();
+        
+        message.append( LS );
+        message.append( "Active Profiles for Project \'" ).append( project.getId() ).append( "\':" );
+        message.append( LS ).append( LS );
 
         if ( activeProfileIds.isEmpty() )
         {
@@ -148,49 +115,19 @@ public class ActiveProfilesMojo
         }
         else
         {
-            message.append( "The following profiles are active:\n" );
+            message.append( "The following profiles are active:" ).append( LS );
 
             for ( Map.Entry<String, List<String>> entry : activeProfileIds.entrySet() )
             {
                 for ( String profileId : entry.getValue() )
                 {
-                    message.append( "\n - " ).append( profileId );
+                    message.append( LS ).append( " - " ).append( profileId );
                     message.append( " (source: " ).append( entry.getKey() ).append( ")" );
                 }
             }
         }
 
-        message.append( "\n" );
+        message.append( LS );
     }
 
-    @SuppressWarnings( "unchecked" )
-    private Map<String, List<String>> getInjectedProfileIds( MavenProject project ) throws UnsupportedOperationException
-    {
-        try
-        {
-            // This method was introduced with M3
-            Method getInjectedProfileIdsMethod = MavenProject.class.getMethod( "getInjectedProfileIds" );
-            return (Map<String, List<String>>) getInjectedProfileIdsMethod.invoke( project );
-        }
-        catch ( SecurityException e )
-        {
-            throw new UnsupportedOperationException( e.getMessage(), e );
-        }
-        catch ( NoSuchMethodException e )
-        {
-            throw new UnsupportedOperationException( e.getMessage(), e );
-        }
-        catch ( IllegalArgumentException e )
-        {
-            throw new UnsupportedOperationException( e.getMessage(), e );
-        }
-        catch ( IllegalAccessException e )
-        {
-            throw new UnsupportedOperationException( e.getMessage(), e );
-        }
-        catch ( InvocationTargetException e )
-        {
-            throw new UnsupportedOperationException( e.getMessage(), e );
-        }
-    }
 }
