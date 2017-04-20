@@ -23,14 +23,18 @@ import java.io.File;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
+import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -336,6 +340,10 @@ public abstract class AbstractAnalyzeMojo
         boolean reported = false;
         boolean warning = false;
 
+        if ( outputXML )
+        {
+            writeDependencyXML( usedUndeclared );
+        }
 
         if ( verbose && !usedDeclared.isEmpty() )
         {
@@ -377,11 +385,6 @@ public abstract class AbstractAnalyzeMojo
 
             logArtifacts( ignoredUnusedDeclared, false );
             reported = true;
-        }
-
-        if ( outputXML )
-        {
-            writeDependencyXML( usedUndeclared );
         }
 
         if ( scriptableOutput )
@@ -432,6 +435,7 @@ public abstract class AbstractAnalyzeMojo
             StringWriter out = new StringWriter();
             PrettyPrintXMLWriter writer = new PrettyPrintXMLWriter( out );
 
+            Set<String> managedDependencies = getManagedDependencies();
             for ( Artifact artifact : artifacts )
             {
                 // called because artifact will set the version to -SNAPSHOT only if I do this. MNG-2961
@@ -444,15 +448,18 @@ public abstract class AbstractAnalyzeMojo
                 writer.startElement( "artifactId" );
                 writer.writeText( artifact.getArtifactId() );
                 writer.endElement();
-                writer.startElement( "version" );
-                writer.writeText( artifact.getBaseVersion() );
+                if ( !managedDependencies.contains( artifact.getDependencyConflictId() ) )
+                {
+                    writer.startElement( "version" );
+                    writer.writeText( artifact.getBaseVersion() );
+                    writer.endElement();
+                }
                 if ( !StringUtils.isBlank( artifact.getClassifier() ) )
                 {
                     writer.startElement( "classifier" );
                     writer.writeText( artifact.getClassifier() );
                     writer.endElement();
                 }
-                writer.endElement();
 
                 if ( !Artifact.SCOPE_COMPILE.equals( artifact.getScope() ) )
                 {
@@ -506,5 +513,33 @@ public abstract class AbstractAnalyzeMojo
         }
 
         return result;
+    }
+
+    private Set<String> getManagedDependencies()
+    {
+        if ( project.getDependencyManagement() == null || project.getDependencyManagement().getDependencies() == null )
+        {
+            return Collections.emptySet();
+        }
+        else
+        {
+            Set<String> managedDependencies = new HashSet<String>();
+            for ( Dependency dependency : project.getDependencyManagement().getDependencies() )
+            {
+                managedDependencies.add( dependency.getManagementKey() );
+            }
+            return managedDependencies;
+        }
+    }
+
+    private static Map<String, Dependency> asMap( List<Dependency> dependencies )
+    {
+        Map<String, Dependency> dependencyMap = new HashMap<String, Dependency>();
+        for ( Dependency dependency : dependencies )
+        {
+            dependencyMap.put( dependency.getManagementKey(), dependency );
+        }
+
+        return dependencyMap;
     }
 }
