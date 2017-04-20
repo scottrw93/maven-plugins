@@ -1,5 +1,6 @@
 env:
   SKIP_VERSION_OVERRIDE: true
+  MAVEN_ARGS: -Drat.skip=true
 
 buildpack:
   host: git.hubteam.com
