@@ -24,11 +24,13 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
@@ -325,14 +327,18 @@ public abstract class AbstractAnalyzeMojo
         }
 
         Set<Artifact> usedDeclared = new HashSet<Artifact>( analysis.getUsedDeclaredArtifacts() );
-        Set<Artifact> usedUndeclared = new HashSet<Artifact>( analysis.getUsedUndeclaredArtifacts() );
+        Map<Artifact, Set<String>> usedUndeclared = new HashMap<Artifact, Set<String>>(
+            analysis.getUsedUndeclaredArtifactToUsageMap()
+        );
         Set<Artifact> unusedDeclared = new HashSet<Artifact>( analysis.getUnusedDeclaredArtifacts() );
 
         Set<Artifact> ignoredUsedUndeclared = new HashSet<Artifact>();
         Set<Artifact> ignoredUnusedDeclared = new HashSet<Artifact>();
 
-        ignoredUsedUndeclared.addAll( filterDependencies( usedUndeclared, ignoredDependencies ) );
-        ignoredUsedUndeclared.addAll( filterDependencies( usedUndeclared, ignoredUsedUndeclaredDependencies ) );
+        ignoredUsedUndeclared.addAll( filterDependencies( usedUndeclared.keySet(), ignoredDependencies ) );
+        ignoredUsedUndeclared.addAll(
+            filterDependencies( usedUndeclared.keySet(), ignoredUsedUndeclaredDependencies )
+        );
 
         ignoredUnusedDeclared.addAll( filterDependencies( unusedDeclared, ignoredDependencies ) );
         ignoredUnusedDeclared.addAll( filterDependencies( unusedDeclared, ignoredUnusedDeclaredDependencies ) );
@@ -342,7 +348,7 @@ public abstract class AbstractAnalyzeMojo
 
         if ( outputXML )
         {
-            writeDependencyXML( usedUndeclared );
+            writeDependencyXML( usedUndeclared.keySet() );
         }
 
         if ( verbose && !usedDeclared.isEmpty() )
@@ -357,7 +363,7 @@ public abstract class AbstractAnalyzeMojo
         {
             getLog().warn( "Used undeclared dependencies found:" );
 
-            logArtifacts( usedUndeclared, true );
+            logArtifacts( usedUndeclared, verbose );
             reported = true;
             warning = true;
         }
@@ -389,7 +395,7 @@ public abstract class AbstractAnalyzeMojo
 
         if ( scriptableOutput )
         {
-            writeScriptableOutput( usedUndeclared );
+            writeScriptableOutput( usedUndeclared.keySet() );
         }
 
         if ( !reported )
@@ -421,6 +427,49 @@ public abstract class AbstractAnalyzeMojo
                 {
                     getLog().info( "   " + artifact );
                 }
+
+            }
+        }
+    }
+
+    private void logArtifacts( Map<Artifact, Set<String>> artifactsWithUsages, boolean verbose )
+    {
+        if ( artifactsWithUsages.isEmpty() )
+        {
+            getLog().info( "   None" );
+        }
+        else
+        {
+            for ( Entry<Artifact, Set<String>> entry : artifactsWithUsages.entrySet() )
+            {
+                Artifact artifact = entry.getKey();
+                List<String> usages = new ArrayList<String>( entry.getValue() );
+                Collections.sort( usages, new Comparator<String>()
+                    {
+                        @Override
+                        public int compare( String o1, String o2 )
+                        {
+                            return Integer.valueOf( o1.length() ).compareTo( o2.length() );
+                        }
+                    }
+                );
+                int total = usages.size();
+                if ( !verbose && total > 5 )
+                {
+                    int extra = total - 5;
+                    usages = new ArrayList<String>( usages.subList( 0, 5 ) );
+                    usages.add( String.format( "... and %d more", extra ) );
+                }
+
+                // called because artifact will set the version to -SNAPSHOT only if I do this. MNG-2961
+                artifact.isSnapshot();
+
+                getLog().warn( "   " + artifact );
+                for ( String usage : usages )
+                {
+                    getLog().warn( "    - " + usage );
+                }
+                getLog().warn( "" );
 
             }
         }
