@@ -1,5 +1,6 @@
 env:
   SKIP_VERSION_OVERRIDE: true
+  MAVEN_OPTS: -Xmx768m
   MAVEN_ARGS: -DskipTests -Drat.skip=true
 
 buildpack:
