@@ -8,3 +8,7 @@ buildpack:
   organization: HubSpot
   repository: Blazar-Buildpack-Java
   branch: v2
+
+stepActivation:
+  notify:
+    branches: [trunk]
