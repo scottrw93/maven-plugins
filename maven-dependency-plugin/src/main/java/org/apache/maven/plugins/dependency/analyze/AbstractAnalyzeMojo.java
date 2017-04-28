@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -43,6 +44,7 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.shared.artifact.filter.StrictPatternExcludesArtifactFilter;
+import org.apache.maven.shared.dependency.analyzer.DependencyUsage;
 import org.apache.maven.shared.dependency.analyzer.ProjectDependencyAnalysis;
 import org.apache.maven.shared.dependency.analyzer.ProjectDependencyAnalyzer;
 import org.apache.maven.shared.dependency.analyzer.ProjectDependencyAnalyzerException;
@@ -327,7 +329,7 @@ public abstract class AbstractAnalyzeMojo
         }
 
         Set<Artifact> usedDeclared = new HashSet<Artifact>( analysis.getUsedDeclaredArtifacts() );
-        Map<Artifact, Set<String>> usedUndeclared = new HashMap<Artifact, Set<String>>(
+        Map<Artifact, Set<DependencyUsage>> usedUndeclared = new HashMap<Artifact, Set<DependencyUsage>>(
             analysis.getUsedUndeclaredArtifactToUsageMap()
         );
         Set<Artifact> unusedDeclared = new HashSet<Artifact>( analysis.getUnusedDeclaredArtifacts() );
@@ -432,7 +434,7 @@ public abstract class AbstractAnalyzeMojo
         }
     }
 
-    private void logArtifacts( Map<Artifact, Set<String>> artifactsWithUsages, boolean verbose )
+    private void logArtifacts( Map<Artifact, Set<DependencyUsage>> artifactsWithUsages, boolean verbose )
     {
         if ( artifactsWithUsages.isEmpty() )
         {
@@ -440,11 +442,11 @@ public abstract class AbstractAnalyzeMojo
         }
         else
         {
-            for ( Entry<Artifact, Set<String>> entry : artifactsWithUsages.entrySet() )
+            for ( Entry<Artifact, Set<DependencyUsage>> entry : artifactsWithUsages.entrySet() )
             {
                 Artifact artifact = entry.getKey();
-                List<String> usages = new ArrayList<String>( entry.getValue() );
-                Collections.sort( usages, new Comparator<String>()
+                List<String> messages = new ArrayList<String>( toMessages( entry.getValue() ) );
+                Collections.sort( messages, new Comparator<String>()
                     {
                         @Override
                         public int compare( String o1, String o2 )
@@ -453,21 +455,21 @@ public abstract class AbstractAnalyzeMojo
                         }
                     }
                 );
-                int total = usages.size();
+                int total = messages.size();
                 if ( !verbose && total > 5 )
                 {
                     int extra = total - 5;
-                    usages = new ArrayList<String>( usages.subList( 0, 5 ) );
-                    usages.add( String.format( "... and %d more", extra ) );
+                    messages = new ArrayList<String>( messages.subList( 0, 5 ) );
+                    messages.add( String.format( "... and %d more", extra ) );
                 }
 
                 // called because artifact will set the version to -SNAPSHOT only if I do this. MNG-2961
                 artifact.isSnapshot();
 
                 getLog().warn( "   " + artifact );
-                for ( String usage : usages )
+                for ( String message : messages )
                 {
-                    getLog().warn( "    - " + usage );
+                    getLog().warn( "    - " + message );
                 }
                 getLog().warn( "" );
 
@@ -581,14 +583,16 @@ public abstract class AbstractAnalyzeMojo
         }
     }
 
-    private static Map<String, Dependency> asMap( List<Dependency> dependencies )
+    private static Collection<String> toMessages( Collection<DependencyUsage> usages )
     {
-        Map<String, Dependency> dependencyMap = new HashMap<String, Dependency>();
-        for ( Dependency dependency : dependencies )
+        String messageFormat = "%s is referenced in %s";
+
+        Collection<String> messages = new ArrayList<String>();
+        for ( DependencyUsage usage : usages )
         {
-            dependencyMap.put( dependency.getManagementKey(), dependency );
+            messages.add( String.format( messageFormat, usage.getDependencyClass(), usage.getUsedBy() ) );
         }
 
-        return dependencyMap;
+        return messages;
     }
 }
