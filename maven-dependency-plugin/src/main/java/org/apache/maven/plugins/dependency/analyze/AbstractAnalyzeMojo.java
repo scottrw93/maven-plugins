@@ -34,6 +34,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
@@ -351,8 +352,13 @@ public abstract class AbstractAnalyzeMojo
         boolean reported = false;
         boolean warning = false;
 
-        writeDependencyXMLToFile( usedUndeclared.keySet(), "missing" );
-        writeDependencyXMLToFile( unusedDeclared, "unused" );
+        Optional<String> maybeMissing = getDependencyXMLForFile( usedUndeclared.keySet(), "missing" );
+        Optional<String> maybeUnused = getDependencyXMLForFile( unusedDeclared, "unused" );
+
+        if ( maybeMissing.isPresent() || maybeUnused.isPresent() )
+        {
+            writeXmlChangeFile( maybeMissing.orElse( "" ) + maybeUnused.orElse( "" ) );
+        }
 
         if ( outputXML )
         {
@@ -484,12 +490,8 @@ public abstract class AbstractAnalyzeMojo
         }
     }
 
-    private void writeDependencyXMLToFile( Set<Artifact> artifacts, String section )
+    private Optional<String> getDependencyXMLForFile( Set<Artifact> artifacts, String section )
     {
-        Build build = project.getModel().getBuild();
-        File targetDir = new File( build.getDirectory() + "/pombot/" );
-        targetDir.mkdir();
-
         if ( !artifacts.isEmpty() )
         {
             getLog().info( "Add the following to your pom to correct the missing dependencies: " );
@@ -499,20 +501,29 @@ public abstract class AbstractAnalyzeMojo
 
             writeDependencyXML( artifacts, writer );
 
-            String output = out.getBuffer().toString();
+            return Optional.of( "<" + section + " name=\"" + project.getName() + "\">\n"
+                + out.getBuffer().toString()
+                + "\n</" + section + ">\n" );
 
-            try
-            {
-                FileWriter f1 = new FileWriter( targetDir + "/pomupdates.txt", true );
-                f1.write( "<" + section + " name=\"" + project.getName() + "\">\n"
-                    + output
-                    + "\n</" + section + ">\n" );
-                f1.close();
-            }
+        }
+        return Optional.empty();
+    }
+
+    private void writeXmlChangeFile( String contents )
+    {
+        Build build = project.getModel().getBuild();
+        File targetDir = new File( build.getDirectory() + "/pombot/" );
+        targetDir.mkdir();
+
+        try
+        {
+            FileWriter f1 = new FileWriter( targetDir + "/pomupdates.txt" );
+            f1.write( String.format( "<dependencychanges>\n%s\n</dependencychanges>", contents ) );
+            f1.close();
+        }
             catch ( IOException e )
-            {
-                e.printStackTrace();
-            }
+        {
+            e.printStackTrace();
         }
     }
 
