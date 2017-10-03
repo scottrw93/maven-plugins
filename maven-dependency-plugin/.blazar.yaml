@@ -1,7 +1,7 @@
 env:
   SKIP_VERSION_OVERRIDE: true
   MAVEN_OPTS: -Xmx768m
-  MAVEN_ARGS: -DskipTests -Drat.skip=true
+  MAVEN_ARGS: -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
 
 buildpack:
   host: git.hubteam.com
