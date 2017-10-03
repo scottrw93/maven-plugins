@@ -514,12 +514,16 @@ public abstract class AbstractAnalyzeMojo
         Build build = project.getModel().getBuild();
         File targetDir = new File( build.getDirectory() + "/pombot/" );
         targetDir.mkdir();
+        String fileName = targetDir + "/pomupdates.txt";
 
         try
         {
-            FileWriter f1 = new FileWriter( targetDir + "/pomupdates.txt" );
+            FileWriter f1 = new FileWriter( fileName );
             f1.write( String.format( "<dependencychanges>\n%s\n</dependencychanges>", contents ) );
             f1.close();
+
+            File payloadFile = new File( fileName );
+            payloadFile.setReadable( true );
         }
             catch ( IOException e )
         {
