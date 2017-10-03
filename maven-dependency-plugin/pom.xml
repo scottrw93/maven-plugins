@@ -30,7 +30,7 @@ under the License.
   </parent>
 
   <artifactId>maven-dependency-plugin</artifactId>
-  <version>3.0-hubspot-SNAPSHOT</version>
+  <version>3.0-write-xml-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>Apache Maven Dependency Plugin</name>
