@@ -7,6 +7,6 @@ buildpack:
   repository: Blazar-Buildpack-Java
   branch: v2
   
-  stepActivation:
+stepActivation:
   notify:
     branches: [trunk]
