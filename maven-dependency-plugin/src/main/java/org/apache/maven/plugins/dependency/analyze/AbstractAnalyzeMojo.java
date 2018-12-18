@@ -264,7 +264,7 @@ public abstract class AbstractAnalyzeMojo
 
         boolean warning = checkDependencies();
 
-        if ( warning && failOnWarning )
+        if ( warning && isFailOnWarning() )
         {
             throw new MojoExecutionException( "Dependency problems found" );
         }
@@ -301,6 +301,21 @@ public abstract class AbstractAnalyzeMojo
     protected final boolean isSkip()
     {
         return skip;
+    }
+
+    protected MavenProject getProject()
+    {
+        return project;
+    }
+
+    protected void handle( Set<Artifact> usedUndeclared, Set<Artifact> unusedDeclared )
+    {
+        // for subclasses to use
+    }
+
+    protected boolean isFailOnWarning()
+    {
+        return failOnWarning;
     }
 
     // private methods --------------------------------------------------------
@@ -404,6 +419,8 @@ public abstract class AbstractAnalyzeMojo
         {
             getLog().info( "No dependency problems found" );
         }
+
+        handle( usedUndeclared.keySet(), unusedDeclared );
 
         return warning;
     }

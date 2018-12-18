@@ -1,0 +1,176 @@
+package org.apache.maven.plugins.dependency.analyze;
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+
+import org.apache.commons.compress.utils.CharsetNames;
+import org.apache.commons.compress.utils.Charsets;
+import org.apache.commons.io.FileUtils;
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.InputLocation;
+import org.apache.maven.model.InputSource;
+import org.apache.maven.plugins.annotations.Execute;
+import org.apache.maven.plugins.annotations.LifecyclePhase;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.project.MavenProject;
+
+/**
+ * Analyzes the dependencies of this project and determines which are: used and declared; used and undeclared; unused
+ * and declared. It will then update the pom.xml to fix any dependency issues found.
+ *
+ * <p>By default, <a href="http://maven.apache.org/shared/maven-dependency-analyzer/">maven-dependency-analyzer</a> is
+ * used to perform the analysis, with limitations due to the fact that it works at bytecode level, but any
+ * analyzer can be plugged in through <code>analyzer</code> parameter.</p>
+ *
+ * @author <a href="mailto:markhobson@gmail.com">Mark Hobson</a>
+ * @version $Id$
+ * @see AnalyzeOnlyMojo
+ * @since 2.0-alpha-3
+ */
+@Mojo( name = "fix", requiresDependencyResolution = ResolutionScope.TEST, threadSafe = true )
+@Execute( phase = LifecyclePhase.TEST_COMPILE )
+public class FixMojo
+    extends AbstractAnalyzeMojo
+{
+
+  @Override
+  protected boolean isFailOnWarning()
+  {
+    return false;
+  }
+
+  @Override
+  @SuppressWarnings( "unchecked" )
+  protected void handle( Set<Artifact> usedUndeclared, Set<Artifact> unusedDeclared )
+  {
+    if ( !( usedUndeclared.isEmpty() && unusedDeclared.isEmpty() ) )
+    {
+      MavenProject project = getProject();
+      String pomLocation = project.getFile().toString();
+      List<String> pomLines = readLines( project.getFile() );
+
+      // TODO handle usedUndeclared
+      for ( Artifact unused : unusedDeclared )
+      {
+        String unusedKey = unused.getDependencyConflictId();
+
+        for ( Dependency dependency : sort( project.getModel().getDependencies() ) )
+        {
+          if ( unusedKey.equals( dependency.getManagementKey() ) )
+          {
+            InputLocation inputLocation = dependency.getLocation( "" );
+            InputSource inputSource = inputLocation.getSource();
+            String dependencySource = inputSource == null ? null : inputSource.getLocation();
+            if ( !pomLocation.equals( dependencySource ) )
+            {
+              getLog().warn( "Unable to fix dependency because it comes from parent: " + dependencySource );
+            }
+            else
+            {
+              int lineIndex = inputLocation.getLineNumber() - 1; // line numbers start at 1
+
+              while ( !pomLines.get( lineIndex ).contains( "</dependency>" ) )
+              {
+                pomLines.remove( lineIndex );
+              }
+
+              pomLines.remove( lineIndex ); // remove that last </dependency> line
+            }
+          }
+        }
+      }
+
+      getLog().info( "Writing updated POM to " + project.getFile() );
+      writeLines( project.getFile(), pomLines );
+    }
+  }
+
+  private static List<String> readLines( File file )
+  {
+    try
+    {
+      return FileUtils.readLines( file, Charsets.UTF_8 );
+    }
+    catch ( IOException e )
+    {
+      throw new RuntimeException( e );
+    }
+  }
+
+  private static void writeLines( File file, List<String> lines )
+  {
+    try
+    {
+      FileUtils.writeLines( file, CharsetNames.UTF_8, lines );
+    }
+    catch ( IOException e )
+    {
+      throw new RuntimeException( e );
+    }
+  }
+
+  /**
+   * Sorts dependencies in reverse order of line number. We want to remove
+   * dependencies starting from the bottom as to not throw off subsequent
+   * line numbers
+   */
+  private static List<Dependency> sort( List<Dependency> unsorted )
+  {
+    Comparator<Dependency> lineNumberComparator = new Comparator<Dependency>()
+    {
+
+      @Override
+      public int compare( Dependency dep1, Dependency dep2 )
+      {
+        InputLocation location1 = dep1.getLocation( "" );
+        int line1 = location1 == null ? 0 : location1.getLineNumber();
+
+        InputLocation location2 = dep2.getLocation( "" );
+        int line2 = location2 == null ? 0 : location2.getLineNumber();
+
+        if ( line1 == line2 )
+        {
+          return 0;
+        }
+        else if ( line1 < line2 )
+        {
+          return 1;
+        }
+        else
+        {
+          return -1;
+        }
+      }
+    };
+
+    List<Dependency> sorted = new ArrayList<Dependency>( unsorted );
+    Collections.sort( sorted, lineNumberComparator );
+    return sorted;
+  }
+}
