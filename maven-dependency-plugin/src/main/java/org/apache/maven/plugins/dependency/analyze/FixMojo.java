@@ -24,7 +24,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.compress.utils.CharsetNames;
@@ -35,6 +37,12 @@ import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.InputLocation;
 import org.apache.maven.model.InputSource;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.building.FileModelSource;
+import org.apache.maven.model.building.ModelProcessor;
+import org.apache.maven.model.building.ModelSource;
+import org.apache.maven.model.io.ModelReader;
+import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -57,6 +65,9 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 public class FixMojo
     extends AbstractAnalyzeMojo
 {
+
+  @Component
+  ModelReader modelReader;
 
   @Override
   protected boolean isFailOnWarning()
@@ -95,7 +106,7 @@ public class FixMojo
     {
       String removalKey = removal.getDependencyConflictId();
 
-      for ( Dependency dependency : sortByLineNumberDescending( getProject().getModel().getDependencies() ) )
+      for ( Dependency dependency : sortByLineNumberDescending( refreshModelFromDisk().getDependencies() ) )
       {
         if ( removalKey.equals( dependency.getManagementKey() ) )
         {
@@ -159,6 +170,30 @@ public class FixMojo
       {
         pomLines.addAll( startDependencies + 1, newLines );
       }
+    }
+  }
+
+  /**
+   * Read the model from disk again in case another plugin has modified it.
+   * Otherwise, the line numbers might have changed which throws off our
+   * dependency removals based on InputLocation
+   */
+  private Model refreshModelFromDisk()
+  {
+    ModelSource source = new FileModelSource( getProject().getFile() );
+
+    Map<String, Object> options = new HashMap<String, Object>();
+    options.put( ModelProcessor.IS_STRICT, true );
+    options.put( ModelProcessor.INPUT_SOURCE, new InputSource() );
+    options.put( ModelProcessor.SOURCE, source );
+
+    try
+    {
+      return modelReader.read( source.getInputStream(), options );
+    }
+    catch ( IOException e )
+    {
+      throw new RuntimeException( e );
     }
   }
 
