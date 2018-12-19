@@ -256,7 +256,7 @@ public class FixMojo
         InputLocation location2 = dep2.getLocation( "" );
         Integer line2 = location2 == null ? 0 : location2.getLineNumber();
 
-        return line1.compareTo(line2) * -1;
+        return line1.compareTo( line2 ) * -1;
       }
     };
 
