@@ -30,6 +30,7 @@ import java.util.Set;
 import org.apache.commons.compress.utils.CharsetNames;
 import org.apache.commons.compress.utils.Charsets;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.InputLocation;
@@ -60,7 +61,19 @@ public class FixMojo
 {
 
   @Override
+  protected boolean isSkip()
+  {
+    return false;
+  }
+
+  @Override
   protected boolean isFailOnWarning()
+  {
+    return false;
+  }
+
+  @Override
+  protected boolean isOutputXML()
   {
     return false;
   }
@@ -75,12 +88,12 @@ public class FixMojo
       String pomLocation = project.getFile().toString();
       List<String> pomLines = readLines( project.getFile() );
 
-      // TODO handle usedUndeclared
+      // process removals before additions to preserve line numbers
       for ( Artifact unused : unusedDeclared )
       {
         String unusedKey = unused.getDependencyConflictId();
 
-        for ( Dependency dependency : sort( project.getModel().getDependencies() ) )
+        for ( Dependency dependency : sortByLineNumberDescending( project.getModel().getDependencies() ) )
         {
           if ( unusedKey.equals( dependency.getManagementKey() ) )
           {
@@ -106,9 +119,91 @@ public class FixMojo
         }
       }
 
+      int startDependencies = findStartDependenciesIndex( pomLines );
+      int endDependencies = findEndDependenciesIndex( pomLines, startDependencies );
+      Set<String> managedDependencies = getManagedDependencies();
+      for ( Artifact undeclared : sortByTestScopeFirst( usedUndeclared ) )
+      {
+        // needed to work around MNG-2961
+        undeclared.isSnapshot();
+
+        List<String> newLines = new ArrayList<String>();
+        newLines.add( "    <dependency>" );
+        newLines.add( "      <groupId> " + undeclared.getGroupId() + "</groupId" );
+        newLines.add( "      <artifactId>" + undeclared.getArtifactId() + "</artifactId>" );
+        if ( !managedDependencies.contains( undeclared.getDependencyConflictId() ) )
+        {
+          newLines.add( "      <version>" + undeclared.getBaseVersion() + "</version>" );
+        }
+        if ( !StringUtils.isBlank( undeclared.getClassifier() ) )
+        {
+          newLines.add( "      <classifier>" + undeclared.getClassifier() + "</classifier>" );
+        }
+        if ( !Artifact.SCOPE_COMPILE.equals( undeclared.getScope() ) )
+        {
+          newLines.add( "      <scope>" + undeclared.getScope() + "</scope>" );
+        }
+        newLines.add( "    </dependency>" );
+
+        // add test-scoped deps at the bottom
+        if ( Artifact.SCOPE_TEST.equals( undeclared.getScope() ) )
+        {
+          pomLines.addAll( endDependencies, newLines );
+        }
+        else
+        {
+          pomLines.addAll( startDependencies + 1, newLines );
+        }
+      }
+
       getLog().info( "Writing updated POM to " + project.getFile() );
       writeLines( project.getFile(), pomLines );
     }
+  }
+
+  private static int findStartDependenciesIndex( List<String> pomLines )
+  {
+    boolean inDependencyManagement = false;
+    for ( int i = 0; i < pomLines.size(); i++ )
+    {
+      String line = pomLines.get( i );
+
+      if ( line.contains( "<dependencyManagement>" ) )
+      {
+        inDependencyManagement = true;
+      }
+
+      if ( line.contains( "</dependencyManagement>" ) )
+      {
+        inDependencyManagement = false;
+      }
+
+      if ( line.contains( "<dependencies>" ) )
+      {
+        if ( !inDependencyManagement )
+        {
+          return i;
+        }
+      }
+    }
+
+    // TODO create our own dependencies section if none found
+    throw new RuntimeException( "No dependencies section found" );
+  }
+
+  private static int findEndDependenciesIndex( List<String> pomLines, int startDependencies )
+  {
+    for ( int i = startDependencies; i < pomLines.size(); i++ )
+    {
+      String line = pomLines.get( i );
+
+      if ( line.contains( "</dependencies>" ) )
+      {
+        return i;
+      }
+    }
+
+    throw new RuntimeException( "Couldn't find end of dependencies section" );
   }
 
   private static List<String> readLines( File file )
@@ -140,7 +235,7 @@ public class FixMojo
    * dependencies starting from the bottom as to not throw off subsequent
    * line numbers
    */
-  private static List<Dependency> sort( List<Dependency> unsorted )
+  private static List<Dependency> sortByLineNumberDescending( List<Dependency> unsorted )
   {
     Comparator<Dependency> lineNumberComparator = new Comparator<Dependency>()
     {
@@ -171,6 +266,44 @@ public class FixMojo
 
     List<Dependency> sorted = new ArrayList<Dependency>( unsorted );
     Collections.sort( sorted, lineNumberComparator );
+    return sorted;
+  }
+
+  /**
+   * Test-scoped deps go at the bottom of the <dependencies> section, so sort
+   * these first to prevent throwing off line numbers at the top
+   */
+  private static List<Artifact> sortByTestScopeFirst( Set<Artifact> unsorted )
+  {
+    Comparator<Artifact> testScopeComparator = new Comparator<Artifact>()
+    {
+
+      @Override
+      public int compare( Artifact artifact1, Artifact artifact2 )
+      {
+        String scope1 = artifact1.getScope() == null ? "compile" : artifact1.getScope();
+        String scope2 = artifact2.getScope() == null ? "compile" : artifact2.getScope();
+        if ( Artifact.SCOPE_TEST.equals( scope1 ) && Artifact.SCOPE_TEST.equals( scope2 ) )
+        {
+          return 0;
+        }
+        else if ( Artifact.SCOPE_TEST.equals( scope1 ) )
+        {
+          return -1;
+        }
+        else if ( Artifact.SCOPE_TEST.equals( scope2 ) )
+        {
+          return 1;
+        }
+        else
+        {
+          return scope1.compareTo( scope2 );
+        }
+      }
+    };
+
+    List<Artifact> sorted = new ArrayList<Artifact>( unsorted );
+    Collections.sort( sorted, testScopeComparator );
     return sorted;
   }
 }

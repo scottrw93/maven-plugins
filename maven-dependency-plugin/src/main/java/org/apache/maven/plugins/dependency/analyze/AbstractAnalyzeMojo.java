@@ -298,14 +298,24 @@ public abstract class AbstractAnalyzeMojo
         this.context = context;
     }
 
-    protected final boolean isSkip()
+    protected MavenProject getProject()
+    {
+        return project;
+    }
+
+    protected boolean isSkip()
     {
         return skip;
     }
 
-    protected MavenProject getProject()
+    protected boolean isFailOnWarning()
     {
-        return project;
+        return failOnWarning;
+    }
+
+    protected boolean isOutputXML()
+    {
+        return outputXML;
     }
 
     protected void handle( Set<Artifact> usedUndeclared, Set<Artifact> unusedDeclared )
@@ -313,9 +323,21 @@ public abstract class AbstractAnalyzeMojo
         // for subclasses to use
     }
 
-    protected boolean isFailOnWarning()
+    protected Set<String> getManagedDependencies()
     {
-        return failOnWarning;
+        if ( project.getDependencyManagement() == null || project.getDependencyManagement().getDependencies() == null )
+        {
+            return Collections.emptySet();
+        }
+        else
+        {
+            Set<String> managedDependencies = new HashSet<String>();
+            for ( Dependency dependency : project.getDependencyManagement().getDependencies() )
+            {
+                managedDependencies.add( dependency.getManagementKey() );
+            }
+            return managedDependencies;
+        }
     }
 
     // private methods --------------------------------------------------------
@@ -363,7 +385,7 @@ public abstract class AbstractAnalyzeMojo
         boolean reported = false;
         boolean warning = false;
 
-        if ( outputXML )
+        if ( isOutputXML() )
         {
             writeDependencyXML( usedUndeclared.keySet() );
         }
@@ -581,23 +603,6 @@ public abstract class AbstractAnalyzeMojo
         }
 
         return result;
-    }
-
-    private Set<String> getManagedDependencies()
-    {
-        if ( project.getDependencyManagement() == null || project.getDependencyManagement().getDependencies() == null )
-        {
-            return Collections.emptySet();
-        }
-        else
-        {
-            Set<String> managedDependencies = new HashSet<String>();
-            for ( Dependency dependency : project.getDependencyManagement().getDependencies() )
-            {
-                managedDependencies.add( dependency.getManagementKey() );
-            }
-            return managedDependencies;
-        }
     }
 
     private static Collection<String> toMessages( Collection<DependencyUsage> usages )
