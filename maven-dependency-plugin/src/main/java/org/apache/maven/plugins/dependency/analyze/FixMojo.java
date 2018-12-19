@@ -39,7 +39,6 @@ import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.apache.maven.project.MavenProject;
 
 /**
  * Analyzes the dependencies of this project and determines which are: used and declared; used and undeclared; unused
@@ -83,80 +82,89 @@ public class FixMojo
   {
     if ( !( usedUndeclared.isEmpty() && unusedDeclared.isEmpty() ) )
     {
-      MavenProject project = getProject();
-      String pomLocation = project.getFile().toString();
-      List<String> pomLines = readLines( project.getFile() );
+      List<String> pomLines = readLines( getProject().getFile() );
 
       // process removals before additions to preserve line numbers
-      for ( Artifact unused : unusedDeclared )
+      removeUnusedDependencies( unusedDeclared, pomLines );
+      addUsedDependencies( usedUndeclared, pomLines );
+
+      getLog().info( "Writing updated POM to " + getProject().getFile() );
+      writeLines( getProject().getFile(), pomLines );
+    }
+  }
+
+  private void removeUnusedDependencies( Set<Artifact> removals, List<String> pomLines )
+  {
+    String pomLocation = getProject().getFile().toString();
+
+    for ( Artifact removal : removals )
+    {
+      String removalKey = removal.getDependencyConflictId();
+
+      for ( Dependency dependency : sortByLineNumberDescending( getProject().getModel().getDependencies() ) )
       {
-        String unusedKey = unused.getDependencyConflictId();
-
-        for ( Dependency dependency : sortByLineNumberDescending( project.getModel().getDependencies() ) )
+        if ( removalKey.equals( dependency.getManagementKey() ) )
         {
-          if ( unusedKey.equals( dependency.getManagementKey() ) )
+          InputLocation inputLocation = dependency.getLocation( "" );
+          InputSource inputSource = inputLocation.getSource();
+          String dependencySource = inputSource == null ? null : inputSource.getLocation();
+          if ( !pomLocation.equals( dependencySource ) )
           {
-            InputLocation inputLocation = dependency.getLocation( "" );
-            InputSource inputSource = inputLocation.getSource();
-            String dependencySource = inputSource == null ? null : inputSource.getLocation();
-            if ( !pomLocation.equals( dependencySource ) )
-            {
-              getLog().warn( "Unable to fix dependency because it comes from parent: " + dependencySource );
-            }
-            else
-            {
-              int lineIndex = inputLocation.getLineNumber() - 1; // line numbers start at 1
+            getLog().warn( "Unable to fix dependency because it comes from parent: " + dependencySource );
+          }
+          else
+          {
+            int lineIndex = inputLocation.getLineNumber() - 1; // line numbers start at 1
 
-              while ( !pomLines.get( lineIndex ).contains( "</dependency>" ) )
-              {
-                pomLines.remove( lineIndex );
-              }
-
-              pomLines.remove( lineIndex ); // remove that last </dependency> line
+            while ( !pomLines.get( lineIndex ).contains( "</dependency>" ) )
+            {
+              pomLines.remove( lineIndex );
             }
+
+            pomLines.remove( lineIndex ); // remove that last </dependency> line
           }
         }
       }
+    }
+  }
 
-      int startDependencies = findStartDependenciesIndex( pomLines );
-      int endDependencies = findEndDependenciesIndex( pomLines, startDependencies );
-      Set<String> managedDependencies = getManagedDependencies();
-      for ( Artifact undeclared : sortByTestScopeFirst( usedUndeclared ) )
+  private void addUsedDependencies( Set<Artifact> additions, List<String> pomLines )
+  {
+    int startDependencies = findStartDependenciesIndex( pomLines );
+    int endDependencies = findEndDependenciesIndex( pomLines, startDependencies );
+    Set<String> managedDependencies = getManagedDependencies();
+    for ( Artifact addition : sortByTestScopeFirst( additions ) )
+    {
+      // needed to work around MNG-2961
+      addition.isSnapshot();
+
+      List<String> newLines = new ArrayList<String>();
+      newLines.add( "    <dependency>" );
+      newLines.add( "      <groupId> " + addition.getGroupId() + "</groupId" );
+      newLines.add( "      <artifactId>" + addition.getArtifactId() + "</artifactId>" );
+      if ( !managedDependencies.contains( addition.getDependencyConflictId() ) )
       {
-        // needed to work around MNG-2961
-        undeclared.isSnapshot();
-
-        List<String> newLines = new ArrayList<String>();
-        newLines.add( "    <dependency>" );
-        newLines.add( "      <groupId> " + undeclared.getGroupId() + "</groupId" );
-        newLines.add( "      <artifactId>" + undeclared.getArtifactId() + "</artifactId>" );
-        if ( !managedDependencies.contains( undeclared.getDependencyConflictId() ) )
-        {
-          newLines.add( "      <version>" + undeclared.getBaseVersion() + "</version>" );
-        }
-        if ( !StringUtils.isBlank( undeclared.getClassifier() ) )
-        {
-          newLines.add( "      <classifier>" + undeclared.getClassifier() + "</classifier>" );
-        }
-        if ( !Artifact.SCOPE_COMPILE.equals( undeclared.getScope() ) )
-        {
-          newLines.add( "      <scope>" + undeclared.getScope() + "</scope>" );
-        }
-        newLines.add( "    </dependency>" );
-
-        // add test-scoped deps at the bottom
-        if ( Artifact.SCOPE_TEST.equals( undeclared.getScope() ) )
-        {
-          pomLines.addAll( endDependencies, newLines );
-        }
-        else
-        {
-          pomLines.addAll( startDependencies + 1, newLines );
-        }
+        newLines.add( "      <version>" + addition.getBaseVersion() + "</version>" );
       }
+      if ( !StringUtils.isBlank( addition.getClassifier() ) )
+      {
+        newLines.add( "      <classifier>" + addition.getClassifier() + "</classifier>" );
+      }
+      if ( !Artifact.SCOPE_COMPILE.equals( addition.getScope() ) )
+      {
+        newLines.add( "      <scope>" + addition.getScope() + "</scope>" );
+      }
+      newLines.add( "    </dependency>" );
 
-      getLog().info( "Writing updated POM to " + project.getFile() );
-      writeLines( project.getFile(), pomLines );
+      // add test-scoped deps at the bottom
+      if ( Artifact.SCOPE_TEST.equals( addition.getScope() ) )
+      {
+        pomLines.addAll( endDependencies, newLines );
+      }
+      else
+      {
+        pomLines.addAll( startDependencies + 1, newLines );
+      }
     }
   }
 
