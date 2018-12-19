@@ -264,7 +264,7 @@ public abstract class AbstractAnalyzeMojo
 
         boolean warning = checkDependencies();
 
-        if ( warning && failOnWarning )
+        if ( warning && isFailOnWarning() )
         {
             throw new MojoExecutionException( "Dependency problems found" );
         }
@@ -298,9 +298,46 @@ public abstract class AbstractAnalyzeMojo
         this.context = context;
     }
 
+    protected MavenProject getProject()
+    {
+        return project;
+    }
+
     protected final boolean isSkip()
     {
         return skip;
+    }
+
+    protected boolean isFailOnWarning()
+    {
+        return failOnWarning;
+    }
+
+    protected boolean isOutputXML()
+    {
+        return outputXML;
+    }
+
+    protected void handle( Set<Artifact> usedUndeclared, Set<Artifact> unusedDeclared )
+    {
+        // for subclasses to use
+    }
+
+    protected Set<String> getManagedDependencies()
+    {
+        if ( project.getDependencyManagement() == null || project.getDependencyManagement().getDependencies() == null )
+        {
+            return Collections.emptySet();
+        }
+        else
+        {
+            Set<String> managedDependencies = new HashSet<String>();
+            for ( Dependency dependency : project.getDependencyManagement().getDependencies() )
+            {
+                managedDependencies.add( dependency.getManagementKey() );
+            }
+            return managedDependencies;
+        }
     }
 
     // private methods --------------------------------------------------------
@@ -348,7 +385,7 @@ public abstract class AbstractAnalyzeMojo
         boolean reported = false;
         boolean warning = false;
 
-        if ( outputXML )
+        if ( isOutputXML() )
         {
             writeDependencyXML( usedUndeclared.keySet() );
         }
@@ -404,6 +441,8 @@ public abstract class AbstractAnalyzeMojo
         {
             getLog().info( "No dependency problems found" );
         }
+
+        handle( usedUndeclared.keySet(), unusedDeclared );
 
         return warning;
     }
@@ -564,23 +603,6 @@ public abstract class AbstractAnalyzeMojo
         }
 
         return result;
-    }
-
-    private Set<String> getManagedDependencies()
-    {
-        if ( project.getDependencyManagement() == null || project.getDependencyManagement().getDependencies() == null )
-        {
-            return Collections.emptySet();
-        }
-        else
-        {
-            Set<String> managedDependencies = new HashSet<String>();
-            for ( Dependency dependency : project.getDependencyManagement().getDependencies() )
-            {
-                managedDependencies.add( dependency.getManagementKey() );
-            }
-            return managedDependencies;
-        }
     }
 
     private static Collection<String> toMessages( Collection<DependencyUsage> usages )
