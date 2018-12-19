@@ -277,24 +277,10 @@ public class FixMojo
       @Override
       public int compare( Artifact artifact1, Artifact artifact2 )
       {
-        String scope1 = artifact1.getScope() == null ? "compile" : artifact1.getScope();
-        String scope2 = artifact2.getScope() == null ? "compile" : artifact2.getScope();
-        if ( Artifact.SCOPE_TEST.equals( scope1 ) && Artifact.SCOPE_TEST.equals( scope2 ) )
-        {
-          return 0;
-        }
-        else if ( Artifact.SCOPE_TEST.equals( scope1 ) )
-        {
-          return -1;
-        }
-        else if ( Artifact.SCOPE_TEST.equals( scope2 ) )
-        {
-          return 1;
-        }
-        else
-        {
-          return scope1.compareTo( scope2 );
-        }
+        Integer key1 = Artifact.SCOPE_TEST.equals( artifact1.getScope() ) ? 0 : 1;
+        Integer key2 = Artifact.SCOPE_TEST.equals( artifact2.getScope() ) ? 0 : 1;
+
+        return key1.compareTo( key2 );
       }
     };
 
