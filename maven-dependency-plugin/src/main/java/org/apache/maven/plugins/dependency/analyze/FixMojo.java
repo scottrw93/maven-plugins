@@ -59,12 +59,6 @@ public class FixMojo
 {
 
   @Override
-  protected boolean isSkip()
-  {
-    return false;
-  }
-
-  @Override
   protected boolean isFailOnWarning()
   {
     return false;

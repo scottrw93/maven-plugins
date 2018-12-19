@@ -303,7 +303,7 @@ public abstract class AbstractAnalyzeMojo
         return project;
     }
 
-    protected boolean isSkip()
+    protected final boolean isSkip()
     {
         return skip;
     }
