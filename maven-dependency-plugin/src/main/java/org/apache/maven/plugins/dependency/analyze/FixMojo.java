@@ -49,10 +49,9 @@ import org.apache.maven.project.MavenProject;
  * used to perform the analysis, with limitations due to the fact that it works at bytecode level, but any
  * analyzer can be plugged in through <code>analyzer</code> parameter.</p>
  *
- * @author <a href="mailto:markhobson@gmail.com">Mark Hobson</a>
+ * @author <a href="mailto:jhaber@hubspot.com">Jonathan Haber</a>
  * @version $Id$
- * @see AnalyzeOnlyMojo
- * @since 2.0-alpha-3
+ * @since 3.0
  */
 @Mojo( name = "fix", requiresDependencyResolution = ResolutionScope.TEST, threadSafe = true )
 @Execute( phase = LifecyclePhase.TEST_COMPILE )
