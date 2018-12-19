@@ -251,23 +251,12 @@ public class FixMojo
       public int compare( Dependency dep1, Dependency dep2 )
       {
         InputLocation location1 = dep1.getLocation( "" );
-        int line1 = location1 == null ? 0 : location1.getLineNumber();
+        Integer line1 = location1 == null ? 0 : location1.getLineNumber();
 
         InputLocation location2 = dep2.getLocation( "" );
-        int line2 = location2 == null ? 0 : location2.getLineNumber();
+        Integer line2 = location2 == null ? 0 : location2.getLineNumber();
 
-        if ( line1 == line2 )
-        {
-          return 0;
-        }
-        else if ( line1 < line2 )
-        {
-          return 1;
-        }
-        else
-        {
-          return -1;
-        }
+        return line1.compareTo(line2) * -1;
       }
     };
 
