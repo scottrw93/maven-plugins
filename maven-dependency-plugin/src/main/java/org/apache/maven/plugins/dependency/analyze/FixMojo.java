@@ -134,7 +134,7 @@ public class FixMojo
 
       List<String> newLines = new ArrayList<String>();
       newLines.add( "    <dependency>" );
-      newLines.add( "      <groupId>" + addition.getGroupId() + "</groupId" );
+      newLines.add( "      <groupId>" + addition.getGroupId() + "</groupId>" );
       newLines.add( "      <artifactId>" + addition.getArtifactId() + "</artifactId>" );
       if ( !managedDependencies.contains( addition.getDependencyConflictId() ) )
       {
