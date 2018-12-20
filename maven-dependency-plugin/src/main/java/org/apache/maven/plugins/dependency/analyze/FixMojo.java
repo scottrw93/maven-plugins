@@ -92,10 +92,6 @@ public class FixMojo
 
       // process removals before additions to preserve line numbers
       removeUnusedDependencies( unusedDeclared, pomLines );
-
-      File withoutUnused = new File( getProject().getFile().getParentFile(), "pom.xml.step1" );
-      writeLines( withoutUnused, pomLines );
-
       addUsedDependencies( usedUndeclared, pomLines );
 
       getLog().info( "Writing updated POM to " + getProject().getFile() );
