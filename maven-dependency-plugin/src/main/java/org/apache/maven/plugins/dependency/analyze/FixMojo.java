@@ -180,21 +180,28 @@ public class FixMojo
    */
   private Model refreshModelFromDisk()
   {
-    ModelSource source = new FileModelSource( getProject().getFile() );
+    ModelSource modelSource = new FileModelSource( getProject().getFile() );
+    InputSource inputSource = new InputSource();
 
     Map<String, Object> options = new HashMap<String, Object>();
     options.put( ModelProcessor.IS_STRICT, true );
-    options.put( ModelProcessor.INPUT_SOURCE, new InputSource() );
-    options.put( ModelProcessor.SOURCE, source );
+    options.put( ModelProcessor.INPUT_SOURCE, inputSource );
+    options.put( ModelProcessor.SOURCE, modelSource );
 
+    final Model model;
     try
     {
-      return modelReader.read( source.getInputStream(), options );
+      model = modelReader.read( modelSource.getInputStream(), options );
     }
     catch ( IOException e )
     {
       throw new RuntimeException( e );
     }
+
+    inputSource.setModelId( getProject().getModel().getId() );
+    inputSource.setLocation( getProject().getFile().getAbsolutePath() );
+
+    return model;
   }
 
   private static int findStartDependenciesIndex( List<String> pomLines )
