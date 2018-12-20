@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -102,32 +103,37 @@ public class FixMojo
   {
     String pomLocation = getProject().getFile().toString();
 
+    Set<String> keysToRemove = new HashSet<String>();
     for ( Artifact removal : removals )
     {
-      String removalKey = removal.getDependencyConflictId();
+      keysToRemove.add( removal.getDependencyConflictId() );
+    }
 
-      for ( Dependency dependency : sortByLineNumberDescending( refreshModelFromDisk().getDependencies() ) )
+    for ( Dependency dependency : sortByLineNumberDescending( refreshModelFromDisk().getDependencies() ) )
+    {
+      if ( keysToRemove.contains( dependency.getManagementKey() ) )
       {
-        if ( removalKey.equals( dependency.getManagementKey() ) )
+        InputLocation inputLocation = dependency.getLocation( "" );
+        InputSource inputSource = inputLocation.getSource();
+        String dependencySource = inputSource == null ? null : inputSource.getLocation();
+        if ( !pomLocation.equals( dependencySource ) )
         {
-          InputLocation inputLocation = dependency.getLocation( "" );
-          InputSource inputSource = inputLocation.getSource();
-          String dependencySource = inputSource == null ? null : inputSource.getLocation();
-          if ( !pomLocation.equals( dependencySource ) )
-          {
-            getLog().warn( "Unable to fix dependency because it comes from parent: " + dependencySource );
-          }
-          else
-          {
-            int lineIndex = inputLocation.getLineNumber() - 1; // line numbers start at 1
+          getLog().warn( "Unable to fix dependency because it comes from parent: " + dependencySource );
+        }
+        else
+        {
+          int lineIndex = inputLocation.getLineNumber() - 1; // line numbers start at 1
+          getLog().debug( "Starting removal of " + dependency.toString() + " at index " + lineIndex );
 
-            while ( !pomLines.get( lineIndex ).contains( "</dependency>" ) )
-            {
-              pomLines.remove( lineIndex );
-            }
-
-            pomLines.remove( lineIndex ); // remove that last </dependency> line
+          while ( !pomLines.get( lineIndex ).contains( "</dependency>" ) )
+          {
+            getLog().debug( "Removing line " + pomLines.get( lineIndex ) );
+            pomLines.remove( lineIndex );
           }
+
+          // remove that last </dependency> line
+          getLog().debug( "Removing line " + pomLines.get( lineIndex ) );
+          pomLines.remove( lineIndex );
         }
       }
     }
