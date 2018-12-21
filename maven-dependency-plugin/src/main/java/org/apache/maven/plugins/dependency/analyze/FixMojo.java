@@ -93,6 +93,12 @@ public class FixMojo
 
       getLog().info( "Writing updated POM to " + getProject().getFile() );
       writeLines( getProject().getFile(), pomLines );
+
+      // Store the updated deps in the plugin context so the analyze mojo can access it
+      Set<Artifact> directDependencies = getProject().getDependencyArtifacts();
+      directDependencies.addAll( usedUndeclared );
+      directDependencies.removeAll( unusedDeclared );
+      getPluginContext().put( DEPENDENCY_OVERRIDES, directDependencies );
     }
   }
 

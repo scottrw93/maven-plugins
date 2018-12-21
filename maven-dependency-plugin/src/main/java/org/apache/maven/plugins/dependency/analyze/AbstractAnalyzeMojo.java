@@ -69,6 +69,8 @@ public abstract class AbstractAnalyzeMojo
 {
     // fields -----------------------------------------------------------------
 
+    protected static final String DEPENDENCY_OVERRIDES = "maven-dependency-plugin.dep-overrides";
+
     /**
      * The plexus context to look-up the right {@link ProjectDependencyAnalyzer} implementation depending on the mojo
      * configuration.
@@ -342,9 +344,22 @@ public abstract class AbstractAnalyzeMojo
 
     // private methods --------------------------------------------------------
 
+    @SuppressWarnings( "unchecked" )
     private boolean checkDependencies()
         throws MojoExecutionException
     {
+        final MavenProject project;
+        Object dependencyOverrides = getPluginContext().get( DEPENDENCY_OVERRIDES );
+        if ( dependencyOverrides == null )
+        {
+            project = this.project;
+        }
+        else
+        {
+            project = this.project.clone();
+            project.setDependencyArtifacts( ( Set<Artifact> ) dependencyOverrides );
+        }
+
         ProjectDependencyAnalysis analysis;
         try
         {
