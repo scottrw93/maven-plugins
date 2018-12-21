@@ -44,8 +44,6 @@ import org.apache.maven.model.building.ModelProcessor;
 import org.apache.maven.model.building.ModelSource;
 import org.apache.maven.model.io.ModelReader;
 import org.apache.maven.plugins.annotations.Component;
-import org.apache.maven.plugins.annotations.Execute;
-import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
@@ -62,7 +60,6 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
  * @since 3.0
  */
 @Mojo( name = "fix", requiresDependencyResolution = ResolutionScope.TEST, threadSafe = true )
-@Execute( phase = LifecyclePhase.TEST_COMPILE )
 public class FixMojo
     extends AbstractAnalyzeMojo
 {
