@@ -197,19 +197,19 @@ public class FixMojo
     else
     {
       Dependency firstTestDep = sortByLineNumberAscending( testDependencies ).get( 0 );
-      backupTestIndex = firstTestDep.getLocation( "" ).getLineNumber() - 1;
+      backupTestIndex = startIndex( firstTestDep );
     }
 
     final int backupNonTestIndex;
     if ( nonTestDependencies.isEmpty() )
     {
       Dependency firstTestDep = sortByLineNumberAscending( testDependencies ).get( 0 );
-      backupNonTestIndex = firstTestDep.getLocation( "" ).getLineNumber() - 1;
+      backupNonTestIndex = startIndex( firstTestDep );
     }
     else
     {
       Dependency firstNonTestDep = sortByLineNumberAscending( nonTestDependencies ).get( 0 );
-      backupNonTestIndex = firstNonTestDep.getLocation( "" ).getLineNumber() - 1;
+      backupNonTestIndex = startIndex( firstNonTestDep );
     }
 
     // add test deps first to maintain line numbers since they go at the bottom
@@ -253,7 +253,7 @@ public class FixMojo
         else
         {
           Dependency firstInGroup = sortByLineNumberAscending( matchingGroupId ).get( 0 );
-          insertIndex = firstInGroup.getLocation( "" ).getLineNumber() - 1;
+          insertIndex = startIndex( firstInGroup );
         }
 
         insertDependency( addition, insertIndex, pomLines );
@@ -315,7 +315,7 @@ public class FixMojo
 
   private static int lineIndexAfter( Dependency dependency, List<String> pomLines )
   {
-    int lineIndex = dependency.getLocation( "" ).getLineNumber() - 1; // line numbers start at 1
+    int lineIndex = startIndex( dependency );
 
     while ( !pomLines.get( lineIndex ).contains( "</dependency>" ) )
     {
@@ -476,11 +476,8 @@ public class FixMojo
       @Override
       public int compare( Dependency dep1, Dependency dep2 )
       {
-        InputLocation location1 = dep1.getLocation( "" );
-        Integer line1 = location1 == null ? 0 : location1.getLineNumber();
-
-        InputLocation location2 = dep2.getLocation( "" );
-        Integer line2 = location2 == null ? 0 : location2.getLineNumber();
+        Integer line1 = startIndex( dep1 );
+        Integer line2 = startIndex( dep2 );
 
         return line1.compareTo( line2 );
       }
@@ -521,5 +518,11 @@ public class FixMojo
     List<Artifact> sorted = new ArrayList<Artifact>( unsorted );
     Collections.sort( sorted, coordinatesComparator );
     return sorted;
+  }
+
+  private static int startIndex( Dependency dependency )
+  {
+    // line numbers start at 1, but we want it 0-indexed
+    return dependency.getLocation( "" ).getLineNumber() - 1;
   }
 }
