@@ -39,9 +39,9 @@ import org.apache.maven.model.Dependency;
 import org.apache.maven.model.InputLocation;
 import org.apache.maven.model.InputSource;
 import org.apache.maven.model.Model;
-import org.apache.maven.model.building.FileModelSource;
 import org.apache.maven.model.building.ModelProcessor;
 import org.apache.maven.model.building.ModelSource;
+import org.apache.maven.model.building.StringModelSource;
 import org.apache.maven.model.io.ModelReader;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -85,24 +85,57 @@ public class FixMojo
   {
     if ( !( usedUndeclared.isEmpty() && unusedDeclared.isEmpty() ) )
     {
-      List<String> pomLines = readLines( getProject().getFile() );
+      File pomFile = getProject().getFile();
+      List<String> pomLines = readLines( pomFile );
 
-      // process removals before additions to preserve line numbers
-      removeUnusedDependencies( unusedDeclared, pomLines );
-      addUsedDependencies( usedUndeclared, pomLines );
+      // rebuild model from disk in case the pom.xml has been modified since the build started
+      List<Dependency> dependencies = rebuildModel( pomLines ).getDependencies();
 
-      getLog().info( "Writing updated POM to " + getProject().getFile() );
-      writeLines( getProject().getFile(), pomLines );
+      if ( !usedUndeclared.isEmpty() )
+      {
+        addUsedDependencies( dependencies, usedUndeclared, pomLines );
+
+        // rebuild model again, since adding dependencies may have changed line numbers
+        dependencies = rebuildModel( pomLines ).getDependencies();
+      }
+
+      if ( !unusedDeclared.isEmpty() )
+      {
+        removeUnusedDependencies( dependencies, unusedDeclared, pomLines );
+      }
+
+      getLog().info( "Writing updated POM to " + pomFile );
+      writeLines( pomFile, pomLines );
 
       // Store the updated deps in the plugin context so the analyze mojo can access it
-      Set<Artifact> directDependencies = getProject().getDependencyArtifacts();
-      directDependencies.addAll( usedUndeclared );
-      directDependencies.removeAll( unusedDeclared );
-      getPluginContext().put( DEPENDENCY_OVERRIDES, directDependencies );
+      getPluginContext().put( DEPENDENCY_OVERRIDES, updatedDependencies( usedUndeclared, unusedDeclared ) );
     }
   }
 
-  private void removeUnusedDependencies( Set<Artifact> removals, List<String> pomLines )
+  private Set<Artifact> updatedDependencies( Set<Artifact> usedUndeclared, Set<Artifact> unusedDeclared )
+  {
+    Set<String> keysToRemove = new HashSet<String>();
+    for ( Artifact unused : unusedDeclared )
+    {
+      keysToRemove.add( unused.getDependencyConflictId() );
+    }
+
+    // for some reason removeAll( unusedDeclared ) doesn't work
+    Set<Artifact> updated = new HashSet<Artifact>();
+    for ( Artifact artifact : getProject().getDependencyArtifacts() )
+    {
+      if ( !keysToRemove.contains( artifact.getDependencyConflictId() ) )
+      {
+        updated.add( artifact );
+      }
+    }
+
+    updated.addAll( usedUndeclared );
+
+    return updated;
+  }
+
+  private void removeUnusedDependencies( List<Dependency> dependencies, Set<Artifact> removals, List<String> pomLines )
   {
     String pomLocation = getProject().getFile().toString();
 
@@ -112,7 +145,7 @@ public class FixMojo
       keysToRemove.add( removal.getDependencyConflictId() );
     }
 
-    for ( Dependency dependency : sortByLineNumberDescending( refreshModelFromDisk().getDependencies() ) )
+    for ( Dependency dependency : sortByLineNumberDescending( dependencies ) )
     {
       if ( keysToRemove.contains( dependency.getManagementKey() ) )
       {
@@ -142,54 +175,102 @@ public class FixMojo
     }
   }
 
-  private void addUsedDependencies( Set<Artifact> additions, List<String> pomLines )
+  private void addUsedDependencies( List<Dependency> dependencies, Set<Artifact> additions, List<String> pomLines )
   {
-    int startDependencies = findStartDependenciesIndex( pomLines );
-    int endDependencies = findEndDependenciesIndex( pomLines, startDependencies );
-    Set<String> managedDependencies = getManagedDependencies();
-    for ( Artifact addition : sortByTestScopeFirst( additions ) )
+    List<Dependency> localDependencies = excludeParentDeps( dependencies );
+
+    if ( localDependencies.isEmpty() )
     {
-      // needed to work around MNG-2961
-      addition.isSnapshot();
+      // TODO create our own dependencies section if none found
+      throw new RuntimeException( "No dependencies section found" );
+    }
 
-      List<String> newLines = new ArrayList<String>();
-      newLines.add( "    <dependency>" );
-      newLines.add( "      <groupId>" + addition.getGroupId() + "</groupId>" );
-      newLines.add( "      <artifactId>" + addition.getArtifactId() + "</artifactId>" );
-      if ( !managedDependencies.contains( addition.getDependencyConflictId() ) )
-      {
-        newLines.add( "      <version>" + addition.getBaseVersion() + "</version>" );
-      }
-      if ( !StringUtils.isBlank( addition.getClassifier() ) )
-      {
-        newLines.add( "      <classifier>" + addition.getClassifier() + "</classifier>" );
-      }
-      if ( !Artifact.SCOPE_COMPILE.equals( addition.getScope() ) )
-      {
-        newLines.add( "      <scope>" + addition.getScope() + "</scope>" );
-      }
-      newLines.add( "    </dependency>" );
+    List<Dependency> testDependencies = consecutiveTestDeps( localDependencies );
+    List<Dependency> nonTestDependencies = consecutiveNonTestDeps( localDependencies );
 
-      // add test-scoped deps at the bottom
-      if ( Artifact.SCOPE_TEST.equals( addition.getScope() ) )
+    final int backupTestIndex;
+    if ( testDependencies.isEmpty() )
+    {
+      Dependency lastDep = sortByLineNumberDescending( nonTestDependencies ).get( 0 );
+      backupTestIndex = lineIndexAfter( lastDep, pomLines );
+    }
+    else
+    {
+      Dependency firstTestDep = sortByLineNumberAscending( testDependencies ).get( 0 );
+      backupTestIndex = firstTestDep.getLocation( "" ).getLineNumber() - 1;
+    }
+
+    final int backupNonTestIndex;
+    if ( nonTestDependencies.isEmpty() )
+    {
+      Dependency firstTestDep = sortByLineNumberAscending( testDependencies ).get( 0 );
+      backupNonTestIndex = firstTestDep.getLocation( "" ).getLineNumber() - 1;
+    }
+    else
+    {
+      Dependency firstNonTestDep = sortByLineNumberAscending( nonTestDependencies ).get( 0 );
+      backupNonTestIndex = firstNonTestDep.getLocation( "" ).getLineNumber() - 1;
+    }
+
+    // add test deps first to maintain line numbers since they go at the bottom
+    addDependencies( onlyTestScoped( additions ), pomLines, testDependencies, backupTestIndex );
+    addDependencies( notTestScoped( additions ), pomLines, nonTestDependencies, backupNonTestIndex );
+  }
+
+  private void addDependencies( Set<Artifact> additions,
+                                List<String> pomLines,
+                                List<Dependency> existing,
+                                int backupIndex )
+  {
+    existing = sortByLineNumberDescending( existing );
+
+    for ( Artifact addition : sortByCoordinatesDescending( additions ) )
+    {
+      boolean inserted = false;
+
+      List<Dependency> matchingGroupId = filterConsecutiveGroupId( existing, addition.getGroupId() );
+      List<Dependency> toSearch = matchingGroupId.isEmpty() ? existing : matchingGroupId;
+
+      for ( Dependency dependency : toSearch )
       {
-        pomLines.addAll( endDependencies, newLines );
+        int comparison = dependency.getManagementKey().compareTo( addition.getDependencyConflictId() );
+        if ( comparison < 0 )
+        {
+          int index = lineIndexAfter( dependency, pomLines );
+          insertDependency( addition, index, pomLines );
+          inserted = true;
+          break;
+        }
       }
-      else
+
+      if ( !inserted )
       {
-        pomLines.addAll( startDependencies + 1, newLines );
+        final int insertIndex;
+        if ( matchingGroupId.isEmpty() )
+        {
+          insertIndex = backupIndex;
+        }
+        else
+        {
+          Dependency firstInGroup = sortByLineNumberAscending( matchingGroupId ).get( 0 );
+          insertIndex = firstInGroup.getLocation( "" ).getLineNumber() - 1;
+        }
+
+        insertDependency( addition, insertIndex, pomLines );
       }
     }
   }
 
-  /**
-   * Read the model from disk again in case another plugin has modified it.
-   * Otherwise, the line numbers might have changed which throws off our
-   * dependency removals based on InputLocation
-   */
-  private Model refreshModelFromDisk()
+  private void insertDependency( Artifact addition, int index, List<String> pomLines )
   {
-    ModelSource modelSource = new FileModelSource( getProject().getFile() );
+    List<String> lines = toDependencyLines( addition );
+    pomLines.addAll( index, lines );
+  }
+
+  private Model rebuildModel( List<String> pomLines )
+  {
+    String pom = StringUtils.join( pomLines, '\n' );
+    ModelSource modelSource = new StringModelSource( pom, getProject().getFile().getPath() );
     InputSource inputSource = new InputSource();
 
     Map<String, Object> options = new HashMap<String, Object>();
@@ -213,49 +294,154 @@ public class FixMojo
     return model;
   }
 
-  private static int findStartDependenciesIndex( List<String> pomLines )
+  private List<Dependency> excludeParentDeps( List<Dependency> unfiltered )
   {
-    boolean inDependencyManagement = false;
-    for ( int i = 0; i < pomLines.size(); i++ )
+    String pomLocation = getProject().getFile().toString();
+    List<Dependency> filtered = new ArrayList<Dependency>();
+
+    for ( Dependency dependency : unfiltered )
     {
-      String line = pomLines.get( i );
-
-      if ( line.contains( "<dependencyManagement>" ) )
+      InputLocation inputLocation = dependency.getLocation( "" );
+      InputSource inputSource = inputLocation.getSource();
+      String dependencySource = inputSource == null ? null : inputSource.getLocation();
+      if ( pomLocation.equals( dependencySource ) )
       {
-        inDependencyManagement = true;
-      }
-
-      if ( line.contains( "</dependencyManagement>" ) )
-      {
-        inDependencyManagement = false;
-      }
-
-      if ( line.contains( "<dependencies>" ) )
-      {
-        if ( !inDependencyManagement )
-        {
-          return i;
-        }
+        filtered.add( dependency );
       }
     }
 
-    // TODO create our own dependencies section if none found
-    throw new RuntimeException( "No dependencies section found" );
+    return filtered;
   }
 
-  private static int findEndDependenciesIndex( List<String> pomLines, int startDependencies )
+  private static int lineIndexAfter( Dependency dependency, List<String> pomLines )
   {
-    for ( int i = startDependencies; i < pomLines.size(); i++ )
-    {
-      String line = pomLines.get( i );
+    int lineIndex = dependency.getLocation( "" ).getLineNumber() - 1; // line numbers start at 1
 
-      if ( line.contains( "</dependencies>" ) )
+    while ( !pomLines.get( lineIndex ).contains( "</dependency>" ) )
+    {
+      lineIndex++;
+    }
+
+    // advance past that last </dependency> line
+    return lineIndex + 1;
+  }
+
+  /**
+   * Returns continuous sequence of test deps from the end of the pom, stops as soon
+   * as it hits a non-test dep
+   */
+  private static List<Dependency> consecutiveTestDeps( List<Dependency> dependencies )
+  {
+    List<Dependency> testDependencies = new ArrayList<Dependency>();
+
+    for ( Dependency dependency : sortByLineNumberDescending( dependencies ) )
+    {
+      if ( Artifact.SCOPE_TEST.equals( dependency.getScope() ) )
       {
-        return i;
+        testDependencies.add( dependency );
+      }
+      else
+      {
+        break;
       }
     }
 
-    throw new RuntimeException( "Couldn't find end of dependencies section" );
+    return testDependencies;
+  }
+
+  /**
+   * Returns continuous sequence of non-test deps from the start of the pom, stops as soon
+   * as it hits a test dep
+   */
+  private static List<Dependency> consecutiveNonTestDeps( List<Dependency> dependencies )
+  {
+    List<Dependency> nonTestDependencies = new ArrayList<Dependency>();
+
+    for ( Dependency dependency : sortByLineNumberAscending( dependencies ) )
+    {
+      if ( Artifact.SCOPE_TEST.equals( dependency.getScope() ) )
+      {
+        break;
+      }
+      else
+      {
+        nonTestDependencies.add( dependency );
+      }
+    }
+
+    return nonTestDependencies;
+  }
+
+  private static Set<Artifact> onlyTestScoped( Set<Artifact> artifacts )
+  {
+    Set<Artifact> filtered = new HashSet<Artifact>();
+    for ( Artifact artifact : artifacts )
+    {
+      if ( Artifact.SCOPE_TEST.equals( artifact.getScope() ) )
+      {
+        filtered.add( artifact );
+      }
+    }
+
+    return filtered;
+  }
+
+  private static Set<Artifact> notTestScoped( Set<Artifact> artifacts )
+  {
+    Set<Artifact> filtered = new HashSet<Artifact>( artifacts );
+    filtered.removeAll( onlyTestScoped( artifacts ) );
+    return filtered;
+  }
+
+  /**
+   * Returns the first consecutive sequence of deps that match groupId
+   */
+  private static List<Dependency> filterConsecutiveGroupId( List<Dependency> unfiltered, String groupId )
+  {
+    List<Dependency> filtered = new ArrayList<Dependency>();
+    boolean startedMatching = false;
+
+    for ( Dependency dependency : unfiltered )
+    {
+      if ( groupId.equals( dependency.getGroupId() ) )
+      {
+        filtered.add( dependency );
+        startedMatching = true;
+      }
+      else if ( startedMatching )
+      {
+        // the consecutive sequence has ended, break out
+        break;
+      }
+    }
+
+    return filtered;
+  }
+
+  private List<String> toDependencyLines( Artifact artifact )
+  {
+    // needed to work around MNG-2961
+    artifact.isSnapshot();
+
+    List<String> lines = new ArrayList<String>();
+    lines.add( "    <dependency>" );
+    lines.add( "      <groupId>" + artifact.getGroupId() + "</groupId>" );
+    lines.add( "      <artifactId>" + artifact.getArtifactId() + "</artifactId>" );
+    if ( !getManagedDependencies().contains( artifact.getDependencyConflictId() ) )
+    {
+      lines.add( "      <version>" + artifact.getBaseVersion() + "</version>" );
+    }
+    if ( !StringUtils.isBlank( artifact.getClassifier() ) )
+    {
+      lines.add( "      <classifier>" + artifact.getClassifier() + "</classifier>" );
+    }
+    if ( !Artifact.SCOPE_COMPILE.equals( artifact.getScope() ) )
+    {
+      lines.add( "      <scope>" + artifact.getScope() + "</scope>" );
+    }
+    lines.add( "    </dependency>" );
+
+    return lines;
   }
 
   private static List<String> readLines( File file )
@@ -282,12 +468,7 @@ public class FixMojo
     }
   }
 
-  /**
-   * Sorts dependencies in reverse order of line number. We want to remove
-   * dependencies starting from the bottom as to not throw off subsequent
-   * line numbers
-   */
-  private static List<Dependency> sortByLineNumberDescending( List<Dependency> unsorted )
+  private static List<Dependency> sortByLineNumberAscending( List<Dependency> unsorted )
   {
     Comparator<Dependency> lineNumberComparator = new Comparator<Dependency>()
     {
@@ -301,7 +482,7 @@ public class FixMojo
         InputLocation location2 = dep2.getLocation( "" );
         Integer line2 = location2 == null ? 0 : location2.getLineNumber();
 
-        return line1.compareTo( line2 ) * -1;
+        return line1.compareTo( line2 );
       }
     };
 
@@ -310,27 +491,35 @@ public class FixMojo
     return sorted;
   }
 
+  private static List<Dependency> sortByLineNumberDescending( List<Dependency> unsorted )
+  {
+    List<Dependency> ascending = new ArrayList<Dependency>( sortByLineNumberAscending( unsorted ) );
+    Collections.reverse( ascending );
+    return ascending;
+  }
+
   /**
    * Test-scoped deps go at the bottom of the <dependencies> section, so sort
-   * these first to prevent throwing off line numbers at the top
+   * these first to prevent throwing off line numbers at the top. Same idea
+   * for the secondary, descending sort by coordinates.
    */
-  private static List<Artifact> sortByTestScopeFirst( Set<Artifact> unsorted )
+  private static List<Artifact> sortByCoordinatesDescending( Set<Artifact> unsorted )
   {
-    Comparator<Artifact> testScopeComparator = new Comparator<Artifact>()
+    Comparator<Artifact> coordinatesComparator = new Comparator<Artifact>()
     {
 
       @Override
       public int compare( Artifact artifact1, Artifact artifact2 )
       {
-        Integer key1 = Artifact.SCOPE_TEST.equals( artifact1.getScope() ) ? 0 : 1;
-        Integer key2 = Artifact.SCOPE_TEST.equals( artifact2.getScope() ) ? 0 : 1;
+        String key1 = artifact1.getDependencyConflictId();
+        String key2 = artifact2.getDependencyConflictId();
 
-        return key1.compareTo( key2 );
+        return key1.compareTo( key2 ) * -1;
       }
     };
 
     List<Artifact> sorted = new ArrayList<Artifact>( unsorted );
-    Collections.sort( sorted, testScopeComparator );
+    Collections.sort( sorted, coordinatesComparator );
     return sorted;
   }
 }
