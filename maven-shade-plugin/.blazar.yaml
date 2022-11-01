@@ -1,11 +1,9 @@
+buildpack:
+  name: Blazar-Buildpack-Java
+
 env:
   SKIP_VERSION_OVERRIDE: true
 
-buildpack:
-  host: git.hubteam.com
-  organization: HubSpot
-  repository: Blazar-Buildpack-Java
-  branch: v2
   
 stepActivation:
   notify:
